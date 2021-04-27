@@ -71,7 +71,9 @@ function deploy_service_bus() {
         --resource-group ${RESOURCE_GROUP} \
         --name RootManageSharedAccessKey \
         --query primaryConnectionString | jq -r .)
-    
+
+    # echo "waiting to stabilize"
+    # sleep 60    
     # create topic subscription
     echo "creating topic subscription: ${SB_SEND_TOPIC}"
     az servicebus topic subscription create \
@@ -79,6 +81,8 @@ function deploy_service_bus() {
         --namespace-name ${SB_NAMESPACE} \
         --topic-name ${SB_SEND_TOPIC} \
         --max-delivery-count 10 \
+        --auto-delete-on-idle PT10M \
+        --default-message-time-to-live PT10M \
         --name ${SB_SEND_TOPIC_SUBSCRIPTION}
 
     # echo "creating topic subscription filter: ${SB_SEND_TOPIC}"
@@ -216,7 +220,7 @@ function publish_function_handlers() {
 
     # push
     echo "pushing container image ${FUNCS_REMOTE_IMAGE} to ${CONTAINER_REGISTRY}"
-    docker push ${FUNCS_REMOTE_IMAGE} -q
+    docker push ${FUNCS_REMOTE_IMAGE} -q &
 }
 
 function save_configuration() {
@@ -299,15 +303,14 @@ elif [ "${COMMAND}" == "deploy" ]; then
     deploy_resource_group
     # deploy container registry
     deploy_container_registry
-    # deploy service bus
-    deploy_service_bus
     # build function handlers
     build_function_handlers
-    # deploy function handlers
-    deploy_function_handlers
     # publish function handlers
     publish_function_handlers
-  
+    # deploy service bus
+    deploy_service_bus
+    # deploy function handlers
+    deploy_function_handlers
     # all completed lock down security
     save_configuration
     # test deployment
