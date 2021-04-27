@@ -42,4 +42,4 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-function.json
+/send-handler/function.json
