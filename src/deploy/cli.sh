@@ -16,12 +16,10 @@ SB_SEND_TOPIC_SUBSCRIPTION="send-topic-subscription"-${UNIQUE_FIX}
 SB_RECEIVE_TOPIC_SUBSCRIPTION="receive-topic-subscription"-${UNIQUE_FIX}
 SB_PROCESS_TOPIC_SUBSCRIPTION="process-topic-subscription"-${UNIQUE_FIX}
 SB_TRANSFORM_TOPIC_SUBSCRIPTION="transform-topic-subscription"-${UNIQUE_FIX}
-
 CONTAINER_REGISTRY=${PROJECT}acr${UNIQUE_FIX}
-CONTAINER_REGISTRY_ID=""
-
+CONTAINER_REGISTRY_ID="<unkown-registry-id>"
 FUNCS_IMAGE=${PROJECT}-funcs:v1.0
-FUNCS_REMOTE_IMAGE=""
+FUNCS_REMOTE_IMAGE="<unknown-image>"
 FUNCS_APP=${PROJECT}-fn-app-${UNIQUE_FIX}
 FUNCS_APP_PLAN=${PROJECT}-fn-asp-${UNIQUE_FIX}
 FUNCS_STORAGE_ACCOUNT=${PROJECT}sa${UNIQUE_FIX}
@@ -80,8 +78,17 @@ function deploy_service_bus() {
         --resource-group ${RESOURCE_GROUP} \
         --namespace-name ${SB_NAMESPACE} \
         --topic-name ${SB_SEND_TOPIC} \
-        --enable-batched-operations true \
+        --max-delivery-count 10 \
         --name ${SB_SEND_TOPIC_SUBSCRIPTION}
+
+    # echo "creating topic subscription filter: ${SB_SEND_TOPIC}"
+    # az servicebus topic subscription rule create \
+    #     --resource-group ${RESOURCE_GROUP} \
+    #     --namespace-name ${SB_NAMESPACE} \
+    #     --topic-name ${SB_SEND_TOPIC} \
+    #     --subscription-name ${SB_SEND_TOPIC_SUBSCRIPTION} \
+    #     --name "all" \
+    #     --filter-sql-expression 1=1
 }
 
 function deploy_container_registry() {
@@ -222,6 +229,10 @@ function save_configuration() {
         -e "s|<SB_PROCESS_TOPIC>|${SB_PROCESS_TOPIC}|" \
         -e "s|<SB_TRANSFORM_TOPIC>|${SB_TRANSFORM_TOPIC}|" \
         -e "s|<SB_CONNECTION_STRING>|${SB_CONNECTION_STRING}|" \
+        -e "s|<SB_SEND_TOPIC_SUBSCRIPTION>|${SB_SEND_TOPIC_SUBSCRIPTION}|" \
+        -e "s|<SB_RECEIVE_TOPIC_SUBSCRIPTION>|${SB_RECEIVE_TOPIC_SUBSCRIPTION}|" \
+        -e "s|<SB_PROCESS_TOPIC_SUBSCRIPTION>|${SB_PROCESS_TOPIC_SUBSCRIPTION}|" \
+        -e "s|<SB_TRANSFORM_TOPIC_SUBSCRIPTION>|${SB_TRANSFORM_TOPIC_SUBSCRIPTION}|" \
         configuration.template.js > configuration.js
     popd    
 }

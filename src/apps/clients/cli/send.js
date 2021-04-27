@@ -19,8 +19,10 @@ const messages = [
 ];
 
 async function main() {
-    console.log(topicName)
-    console.log(connectionString)
+    // output
+    console.log("cli-send");
+    console.log("using topic: " + topicName);
+    console.log("using connection string: " + connectionString);
 
     // create a Service Bus client using the connection string to the Service Bus namespace
     const sbClient = new ServiceBusClient(connectionString);

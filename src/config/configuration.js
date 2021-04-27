@@ -1,9 +1,15 @@
 module.exports = {
-    connection: "Endpoint=sb://ammmia-sbns-1619541544.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=y4XHjDrQ281/S3LY9Xh54vMXocyZbjNiwOwoGcsRR00=",
+    connection: "Endpoint=sb://ammmia-sbns-1619551024.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=h2sAmNrLTVdwC93YlCGbCuh8pX9k2E/GGRXXHUulN0c=",
     topics: {
-        send: "send-topic-1619541544",
-        receive: "receive-topic-1619541544",
-        process: "process-topic-1619541544",
-        transform: "transform-topic-1619541544"
+        send: "send",
+        receive: "receive-topic-1619551024",
+        process: "process-topic-1619551024",
+        transform: "transform-topic-1619551024"
+    },
+    subscriptions: {
+        send: "sender",
+        receive: "receive-topic-subscription-1619551024",
+        process: "process-topic-subscription-1619551024",
+        transform: "transform-topic-subscription-1619551024"
     }
 }

@@ -3,8 +3,8 @@
         "name": "message",
         "type": "serviceBusTrigger",
         "direction": "in",
-        "topicName": "send-topic-1619541544",
-        "subscriptionName": "send-topic-subscription-1619541544",
+        "topicName": "send-topic-1619558457",
+        "subscriptionName": "send-topic-subscription-1619558457",
         "connection": "SB_CONNECTION_STRING"
     }],
     "scriptFile": "../dist/send-handler/index.js"
