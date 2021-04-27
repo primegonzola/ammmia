@@ -1,0 +1,11 @@
+{
+    "bindings": [{
+        "name": "message",
+        "type": "serviceBusTrigger",
+        "direction": "in",
+        "topicName": "send-topic-1619541544",
+        "subscriptionName": "send-topic-subscription-1619541544",
+        "connection": "SB_CONNECTION_STRING"
+    }],
+    "scriptFile": "../dist/send-handler/index.js"
+}
