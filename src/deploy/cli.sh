@@ -8,11 +8,13 @@ UNIQUE_FIX=$(date +%s)
 RESOURCE_GROUP=${PROJECT}-${UNIQUE_FIX}
 SB_NAMESPACE=${PROJECT}-sbns-${UNIQUE_FIX}
 SB_SEND_TOPIC="send-topic"-${UNIQUE_FIX}
+SB_DISPATCH_TOPIC="dispach-topic"-${UNIQUE_FIX}
 SB_RECEIVE_TOPIC="receive-topic"-${UNIQUE_FIX}
 SB_PROCESS_TOPIC="process-topic"-${UNIQUE_FIX}
 SB_TRANSFORM_TOPIC="transform-topic"-${UNIQUE_FIX}
 SB_CONNECTION_STRING=""
 SB_SEND_TOPIC_SUBSCRIPTION="send-topic-subscription"-${UNIQUE_FIX}
+SB_DISPATCH_TOPIC_SUBSCRIPTION="send-dispatch-subscription"-${UNIQUE_FIX}
 SB_RECEIVE_TOPIC_SUBSCRIPTION="receive-topic-subscription"-${UNIQUE_FIX}
 SB_PROCESS_TOPIC_SUBSCRIPTION="process-topic-subscription"-${UNIQUE_FIX}
 SB_TRANSFORM_TOPIC_SUBSCRIPTION="transform-topic-subscription"-${UNIQUE_FIX}
@@ -43,6 +45,14 @@ function deploy_service_bus() {
         --resource-group ${RESOURCE_GROUP} \
         --namespace-name ${SB_NAMESPACE} \
         --name ${SB_SEND_TOPIC}
+
+    # create topics in service bus
+    echo "creating service bus topic: ${SB_DISPATCH_TOPIC}"
+    az servicebus topic create \
+        --resource-group ${RESOURCE_GROUP} \
+        --namespace-name ${SB_NAMESPACE} \
+        --name ${SB_DISPATCH_TOPIC}
+
 
     # create topics in service bus
     echo "creating service bus topic: ${SB_RECEIVE_TOPIC}"
@@ -85,14 +95,45 @@ function deploy_service_bus() {
         --default-message-time-to-live PT10M \
         --name ${SB_SEND_TOPIC_SUBSCRIPTION}
 
-    # echo "creating topic subscription filter: ${SB_SEND_TOPIC}"
-    # az servicebus topic subscription rule create \
-    #     --resource-group ${RESOURCE_GROUP} \
-    #     --namespace-name ${SB_NAMESPACE} \
-    #     --topic-name ${SB_SEND_TOPIC} \
-    #     --subscription-name ${SB_SEND_TOPIC_SUBSCRIPTION} \
-    #     --name "all" \
-    #     --filter-sql-expression 1=1
+    echo "creating topic subscription: ${SB_DISPATCH_TOPIC}"
+    az servicebus topic subscription create \
+        --resource-group ${RESOURCE_GROUP} \
+        --namespace-name ${SB_NAMESPACE} \
+        --topic-name ${SB_DISPATCH_TOPIC} \
+        --max-delivery-count 10 \
+        --auto-delete-on-idle PT10M \
+        --default-message-time-to-live PT10M \
+        --name ${SB_DISPATCH_TOPIC_SUBSCRIPTION}
+
+    echo "creating topic subscription: ${SB_RECEIVE_TOPIC}"
+    az servicebus topic subscription create \
+        --resource-group ${RESOURCE_GROUP} \
+        --namespace-name ${SB_NAMESPACE} \
+        --topic-name ${SB_RECEIVE_TOPIC} \
+        --max-delivery-count 10 \
+        --auto-delete-on-idle PT10M \
+        --default-message-time-to-live PT10M \
+        --name ${SB_RECEIVE_TOPIC_SUBSCRIPTION}
+
+    echo "creating topic subscription: ${SB_PROCESS_TOPIC}"
+    az servicebus topic subscription create \
+        --resource-group ${RESOURCE_GROUP} \
+        --namespace-name ${SB_NAMESPACE} \
+        --topic-name ${SB_PROCESS_TOPIC} \
+        --max-delivery-count 10 \
+        --auto-delete-on-idle PT10M \
+        --default-message-time-to-live PT10M \
+        --name ${SB_PROCESS_TOPIC_SUBSCRIPTION}
+
+   echo "creating topic subscription: ${SB_TRANSFORM_TOPIC}"
+    az servicebus topic subscription create \
+        --resource-group ${RESOURCE_GROUP} \
+        --namespace-name ${SB_NAMESPACE} \
+        --topic-name ${SB_TRANSFORM_TOPIC} \
+        --max-delivery-count 10 \
+        --auto-delete-on-idle PT10M \
+        --default-message-time-to-live PT10M \
+        --name ${SB_TRANSFORM_TOPIC}
 }
 
 function deploy_container_registry() {
@@ -126,6 +167,12 @@ function build_function_handlers() {
     sed \
         -e "s|<SB_SEND_TOPIC>|${SB_SEND_TOPIC}|" \
         -e "s|<SB_SEND_TOPIC_SUBSCRIPTION>|${SB_SEND_TOPIC_SUBSCRIPTION}|" \
+        function.template.json > function.json
+    popd
+    pushd ./dispatch-handler
+    sed \
+        -e "s|<SB_DISPATCH_TOPIC>|${SB_DISPATCH_TOPIC}|" \
+        -e "s|<SB_DISPATCH_TOPIC_SUBSCRIPTION>|${SB_DISPATCH_TOPIC_SUBSCRIPTION}|" \
         function.template.json > function.json
     popd
     # build container hosting our functions
@@ -196,7 +243,51 @@ function deploy_function_handlers() {
         --name ${FUNCS_APP} \
         --resource-group ${RESOURCE_GROUP} \
         --settings SB_CONNECTION_STRING=${SB_CONNECTION_STRING}
-        
+
+    # topics
+    az functionapp config appsettings set \
+        --name ${FUNCS_APP} \
+        --resource-group ${RESOURCE_GROUP} \
+        --settings SB_SEND_TOPIC=${SB_SEND_TOPIC}
+    az functionapp config appsettings set \
+        --name ${FUNCS_APP} \
+        --resource-group ${RESOURCE_GROUP} \
+        --settings SB_DISPATCH_TOPIC=${SB_DISPATCH_TOPIC}
+    az functionapp config appsettings set \
+        --name ${FUNCS_APP} \
+        --resource-group ${RESOURCE_GROUP} \
+        --settings SB_RECEIVE_TOPIC=${SB_RECEIVE_TOPIC}
+    az functionapp config appsettings set \
+        --name ${FUNCS_APP} \
+        --resource-group ${RESOURCE_GROUP} \
+        --settings SB_PROCESS_TOPIC=${SB_PROCESS_TOPIC}
+    az functionapp config appsettings set \
+        --name ${FUNCS_APP} \
+        --resource-group ${RESOURCE_GROUP} \
+        --settings SB_TRANSFORM_TOPIC=${SB_TRANSFORM_TOPIC}
+
+    # subscriptions
+    az functionapp config appsettings set \
+        --name ${FUNCS_APP} \
+        --resource-group ${RESOURCE_GROUP} \
+        --settings SB_SEND_TOPIC_SUBSCRIPTION=${SB_SEND_TOPIC_SUBSCRIPTION}
+    az functionapp config appsettings set \
+        --name ${FUNCS_APP} \
+        --resource-group ${RESOURCE_GROUP} \
+        --settings SB_DISPATCH_TOPIC_SUBSCRIPTION=${SB_DISPATCH_TOPIC_SUBSCRIPTION}
+    az functionapp config appsettings set \
+        --name ${FUNCS_APP} \
+        --resource-group ${RESOURCE_GROUP} \
+        --settings SB_RECEIVE_TOPIC_SUBSCRIPTION=${SB_RECEIVE_TOPIC_SUBSCRIPTION}
+    az functionapp config appsettings set \
+        --name ${FUNCS_APP} \
+        --resource-group ${RESOURCE_GROUP} \
+        --settings SB_PROCESS_TOPIC_SUBSCRIPTION=${SB_PROCESS_TOPIC_SUBSCRIPTION}
+    az functionapp config appsettings set \
+        --name ${FUNCS_APP} \
+        --resource-group ${RESOURCE_GROUP} \
+        --settings SB_TRANSFORM_TOPIC_SUBSCRIPTION=${SB_TRANSFORM_TOPIC_SUBSCRIPTION}
+
     # getting additional info from newly created function  app
     echo "enabling function diagnostics: ${FUNCS_APP}"
     az webapp log config \
