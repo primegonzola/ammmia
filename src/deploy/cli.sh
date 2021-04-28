@@ -198,6 +198,14 @@ function deploy_function_handlers() {
         --settings SB_CONNECTION_STRING=${SB_CONNECTION_STRING}
         
     # getting additional info from newly created function  app
+    echo "enabling function diagnostics: ${FUNCS_APP}"
+    az webapp log config \
+        --resource-group ${RESOURCE_GROUP} \
+        --name ${FUNCS_APP} \
+        --docker-container-logging filesystem \
+        --application-logging filesystem
+
+    # getting additional info from newly created function  app
     echo "getting additionals settings from functions app: ${FUNCS_APP_PLAN}"
     FUNCS_PRINCIPAL_ID=$(az functionapp show \
         --resource-group ${RESOURCE_GROUP} \
