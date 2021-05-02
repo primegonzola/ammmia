@@ -1,7 +1,7 @@
 import { Utils } from "../common/utils";
 import { ServiceBusClient, ServiceBusMessage } from "@azure/service-bus";
 
-class RelayMessage {
+export class SdkMessage {
     public readonly id: string;
     public readonly service: string;
     public readonly command: string;
@@ -12,6 +12,35 @@ class RelayMessage {
         this.service = service;
         this.command = command;
         this.data = data;
+    }
+}
+
+export class RelayMessage {
+    public readonly id: string;
+    public readonly from: TopicOptions;
+    public readonly to: TopicOptions;
+    public readonly data: unknown;
+
+    constructor(from: TopicOptions, to: TopicOptions, data?: unknown) {
+        this.id = Utils.uuid();
+        this.from = from;
+        this.to = to;
+        this.data = data;
+    }
+
+    public static serialize(instance:RelayMessage): any {
+        return JSON.stringify(instance);
+    }
+
+    public static deserialize(data: string): RelayMessage {
+        // read incoming
+        const instance = JSON.parse(data);
+        // construct
+        return new RelayMessage(
+            instance.from,
+            instance.to,
+            instance.data
+        );
     }
 }
 
@@ -85,15 +114,18 @@ export class Sdk {
         }
     }
 
-    public async relay(from: TopicOptions, to: TopicOptions, message: any): Promise<void> {
+    public async relay(message: RelayMessage): Promise<void> {
         // sanity check
-        if (from === to)
-            throw new Error("invalied-from-to");
+        if (message.from === message.to)
+            throw new Error("invalied-from-to: " + message.id);
         // create our sender
         const sender = this.client.createSender(
-            this.resolveTopic(to));
+            this.resolveTopic(message.to));
         // log
-        console.log("relaying message from " + from + " to " + to);
+        console.log("relaying message from " +
+            message.from + " to " +
+            message.to + " with id " +
+            message.id);
         // send our message
         await sender.sendMessages({
             body: JSON.stringify(message)
@@ -111,7 +143,7 @@ export class Sdk {
         console.log("sending message for topic " + topic);
         // send our message
         await sender.sendMessages({
-            body: JSON.stringify(message)
+            body: RelayMessage.serialize(message)
         });
 
         // all done

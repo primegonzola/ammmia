@@ -1,4 +1,5 @@
 
+import {performance} from "perf_hooks";
 export class Utils {
     public static uuid(): string {
         //Timestamp
