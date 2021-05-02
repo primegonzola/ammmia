@@ -7,11 +7,32 @@ export class SdkMessage {
     public readonly command: string;
     public readonly data: unknown;
 
-    constructor(service: string, command: string, data?: unknown) {
-        this.id = Utils.uuid();
+    constructor(id:string, service: string, command: string, data?: unknown) {
+        this.id = id || Utils.uuid();
         this.service = service;
         this.command = command;
         this.data = data;
+    }
+
+    public static serialize(instance: SdkMessage): any {
+        return JSON.stringify({
+            id: instance.id,
+            service: instance.service,
+            command: instance.command,
+            data: instance.data
+        });
+    }
+
+    public static deserialize(data: string): SdkMessage {
+        // read incoming
+        const instance = JSON.parse(data);
+        // construct
+        return new SdkMessage(
+            instance.id,
+            instance.service,
+            instance.dommand,
+            instance.data
+        );
     }
 }
 
@@ -21,15 +42,20 @@ export class RelayMessage {
     public readonly to: TopicOptions;
     public readonly data: unknown;
 
-    constructor(from: TopicOptions, to: TopicOptions, data?: unknown) {
-        this.id = Utils.uuid();
+    constructor(id: string, from: TopicOptions, to: TopicOptions, data?: unknown) {
+        this.id = id || Utils.uuid();
         this.from = from;
         this.to = to;
         this.data = data;
     }
 
-    public static serialize(instance:RelayMessage): any {
-        return JSON.stringify(instance);
+    public static serialize(instance: RelayMessage): any {
+        return JSON.stringify({
+            id: instance.id,
+            from: instance.from,
+            to: instance.to,
+            data: instance.data
+        });
     }
 
     public static deserialize(data: string): RelayMessage {
@@ -37,6 +63,7 @@ export class RelayMessage {
         const instance = JSON.parse(data);
         // construct
         return new RelayMessage(
+            instance.id,
             instance.from,
             instance.to,
             instance.data

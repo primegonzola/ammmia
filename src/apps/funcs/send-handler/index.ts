@@ -10,6 +10,7 @@ const serviceBusTopicTrigger: AzureFunction = async function(context: Context, m
 
     // relay message to dispatch
     await sdk.relay(new RelayMessage(
+        undefined,
         TopicOptions.Send,
         TopicOptions.Dispatch,
         message

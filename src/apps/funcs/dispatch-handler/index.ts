@@ -16,6 +16,7 @@ const serviceBusTopicTrigger: AzureFunction = async function (context: Context, 
         case TopicOptions.Send: {
             // relay message to transform
             await sdk.relay(new RelayMessage(
+                undefined,
                 TopicOptions.Dispatch,
                 TopicOptions.Transform,
                 source.data
@@ -25,6 +26,7 @@ const serviceBusTopicTrigger: AzureFunction = async function (context: Context, 
         case TopicOptions.Transform: {
             // relay message to transform
             await sdk.relay(new RelayMessage(
+                undefined,
                 TopicOptions.Dispatch,
                 TopicOptions.Process,
                 source.data
@@ -34,6 +36,7 @@ const serviceBusTopicTrigger: AzureFunction = async function (context: Context, 
         case TopicOptions.Process: {
             // relay message to transform
             await sdk.relay(new RelayMessage(
+                undefined,
                 TopicOptions.Dispatch,
                 TopicOptions.Receive,
                 source.data

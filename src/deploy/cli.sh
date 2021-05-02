@@ -328,7 +328,7 @@ function publish_function_handlers() {
 
     # push
     echo "pushing container image ${FUNCS_REMOTE_IMAGE} to ${CONTAINER_REGISTRY}"
-    docker push ${FUNCS_REMOTE_IMAGE} -q
+    docker push ${FUNCS_REMOTE_IMAGE}
 }
 
 function save_configuration() {
@@ -418,7 +418,7 @@ elif [ "${COMMAND}" == "deploy" ]; then
     # build function handlers
     build_function_handlers
     # publish function handlers
-    publish_function_handlers &
+    publish_function_handlers
     # deploy service bus
     deploy_service_bus
     # deploy function handlers
