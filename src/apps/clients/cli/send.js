@@ -22,17 +22,21 @@ const json_message = {
     data: "AAAA-BBBB-CCCC-DDDD-EEEE"
 };
 
+// const messages = [
+//     { body: "Albert Einstein" },
+//     { body: "Werner Heisenberg" },
+//     { body: "Marie Curie" },
+//     { body: "Steven Hawking" },
+//     { body: "Isaac Newton" },
+//     { body: "Niels Bohr" },
+//     { body: "Michael Faraday" },
+//     { body: "Galileo Galilei" },
+//     { body: "Johannes Kepler" },
+//     { body: "Nikolaus Kopernikus" }
+// ];
+
 const messages = [
-    { body: "Albert Einstein" },
-    { body: "Werner Heisenberg" },
-    { body: "Marie Curie" },
-    { body: "Steven Hawking" },
-    { body: "Isaac Newton" },
-    { body: "Niels Bohr" },
-    { body: "Michael Faraday" },
-    { body: "Galileo Galilei" },
-    { body: "Johannes Kepler" },
-    { body: "Nikolaus Kopernikus" }
+    { body: "Albert Einstein" }
 ];
 
 async function main() {
@@ -57,7 +61,7 @@ async function main() {
         for (let i = 0; i < messages.length; i++) {
             // for each message in the array			
             json_message.invoke = i.toString();
-            json_message.data = "AAAA-" + messages.length;
+            json_message.data = "AAAA-" + i.toString();
             // set message
             const message = {
                 body: JSON.stringify(json_message)

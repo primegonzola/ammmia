@@ -3,9 +3,9 @@
         "name": "message",
         "type": "serviceBusTrigger",
         "direction": "in",
-        "topicName": "<SB_SEND_TOPIC>",
-        "subscriptionName": "<SB_SEND_TOPIC_SUBSCRIPTION>",
+        "topicName": "dispach-topic-1619984878",
+        "subscriptionName": "dispatch-subscription-1619984878",
         "connection": "SB_CONNECTION_STRING"
     }],
-    "scriptFile": "../dist/send-handler/index.js"
+    "scriptFile": "../dist/dispatch-handler/index.js"
 }

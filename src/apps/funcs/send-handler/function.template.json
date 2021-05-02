@@ -4,7 +4,7 @@
         "type": "serviceBusTrigger",
         "direction": "in",
         "topicName": "<SB_SEND_TOPIC>",
-        "subscriptionName": "<SB_SEND_TOPIC_SUBSCRIPTION>",
+        "subscriptionName": "<SB_SEND_SUBSCRIPTION>",
         "connection": "SB_CONNECTION_STRING"
     }],
     "scriptFile": "../dist/send-handler/index.js"

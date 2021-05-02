@@ -5,6 +5,12 @@ PROJECT="ammmia"
 LOCATION="westeurope"
 UNIQUE_FIX=${RANDOM}
 UNIQUE_FIX=$(date +%s)
+
+# override here
+if [ "${COMMAND}" == "update" ]; then
+    UNIQUE_FIX="${2}"
+fi
+
 RESOURCE_GROUP=${PROJECT}-${UNIQUE_FIX}
 SB_NAMESPACE=${PROJECT}-sbns-${UNIQUE_FIX}
 SB_SEND_TOPIC="send-topic"-${UNIQUE_FIX}
@@ -13,11 +19,11 @@ SB_RECEIVE_TOPIC="receive-topic"-${UNIQUE_FIX}
 SB_PROCESS_TOPIC="process-topic"-${UNIQUE_FIX}
 SB_TRANSFORM_TOPIC="transform-topic"-${UNIQUE_FIX}
 SB_CONNECTION_STRING=""
-SB_SEND_TOPIC_SUBSCRIPTION="send-topic-subscription"-${UNIQUE_FIX}
-SB_DISPATCH_TOPIC_SUBSCRIPTION="send-dispatch-subscription"-${UNIQUE_FIX}
-SB_RECEIVE_TOPIC_SUBSCRIPTION="receive-topic-subscription"-${UNIQUE_FIX}
-SB_PROCESS_TOPIC_SUBSCRIPTION="process-topic-subscription"-${UNIQUE_FIX}
-SB_TRANSFORM_TOPIC_SUBSCRIPTION="transform-topic-subscription"-${UNIQUE_FIX}
+SB_SEND_SUBSCRIPTION="send-subscription"-${UNIQUE_FIX}
+SB_DISPATCH_SUBSCRIPTION="dispatch-subscription"-${UNIQUE_FIX}
+SB_RECEIVE_SUBSCRIPTION="receive-subscription"-${UNIQUE_FIX}
+SB_PROCESS_SUBSCRIPTION="process-subscription"-${UNIQUE_FIX}
+SB_TRANSFORM_SUBSCRIPTION="transform-subscription"-${UNIQUE_FIX}
 CONTAINER_REGISTRY=${PROJECT}acr${UNIQUE_FIX}
 CONTAINER_REGISTRY_ID="<unkown-registry-id>"
 FUNCS_IMAGE=${PROJECT}-funcs:v1.0
@@ -93,7 +99,7 @@ function deploy_service_bus() {
         --max-delivery-count 10 \
         --auto-delete-on-idle PT10M \
         --default-message-time-to-live PT10M \
-        --name ${SB_SEND_TOPIC_SUBSCRIPTION}
+        --name ${SB_SEND_SUBSCRIPTION}
 
     echo "creating topic subscription: ${SB_DISPATCH_TOPIC}"
     az servicebus topic subscription create \
@@ -103,7 +109,7 @@ function deploy_service_bus() {
         --max-delivery-count 10 \
         --auto-delete-on-idle PT10M \
         --default-message-time-to-live PT10M \
-        --name ${SB_DISPATCH_TOPIC_SUBSCRIPTION}
+        --name ${SB_DISPATCH_SUBSCRIPTION}
 
     echo "creating topic subscription: ${SB_RECEIVE_TOPIC}"
     az servicebus topic subscription create \
@@ -113,7 +119,7 @@ function deploy_service_bus() {
         --max-delivery-count 10 \
         --auto-delete-on-idle PT10M \
         --default-message-time-to-live PT10M \
-        --name ${SB_RECEIVE_TOPIC_SUBSCRIPTION}
+        --name ${SB_RECEIVE_SUBSCRIPTION}
 
     echo "creating topic subscription: ${SB_PROCESS_TOPIC}"
     az servicebus topic subscription create \
@@ -123,7 +129,7 @@ function deploy_service_bus() {
         --max-delivery-count 10 \
         --auto-delete-on-idle PT10M \
         --default-message-time-to-live PT10M \
-        --name ${SB_PROCESS_TOPIC_SUBSCRIPTION}
+        --name ${SB_PROCESS_SUBSCRIPTION}
 
    echo "creating topic subscription: ${SB_TRANSFORM_TOPIC}"
     az servicebus topic subscription create \
@@ -133,7 +139,7 @@ function deploy_service_bus() {
         --max-delivery-count 10 \
         --auto-delete-on-idle PT10M \
         --default-message-time-to-live PT10M \
-        --name ${SB_TRANSFORM_TOPIC}
+        --name ${SB_TRANSFORM_SUBSCRIPTION}
 }
 
 function deploy_container_registry() {
@@ -144,6 +150,9 @@ function deploy_container_registry() {
         -g ${RESOURCE_GROUP} \
         --admin-enabled true \
         --sku Basic
+}
+
+function set_container_context() {
     # login
     echo "logging in container registry: ${CONTAINER_REGISTRY}"
     az acr login --name ${CONTAINER_REGISTRY}
@@ -166,13 +175,13 @@ function build_function_handlers() {
     pushd ./send-handler
     sed \
         -e "s|<SB_SEND_TOPIC>|${SB_SEND_TOPIC}|" \
-        -e "s|<SB_SEND_TOPIC_SUBSCRIPTION>|${SB_SEND_TOPIC_SUBSCRIPTION}|" \
+        -e "s|<SB_SEND_SUBSCRIPTION>|${SB_SEND_SUBSCRIPTION}|" \
         function.template.json > function.json
     popd
     pushd ./dispatch-handler
     sed \
         -e "s|<SB_DISPATCH_TOPIC>|${SB_DISPATCH_TOPIC}|" \
-        -e "s|<SB_DISPATCH_TOPIC_SUBSCRIPTION>|${SB_DISPATCH_TOPIC_SUBSCRIPTION}|" \
+        -e "s|<SB_DISPATCH_SUBSCRIPTION>|${SB_DISPATCH_SUBSCRIPTION}|" \
         function.template.json > function.json
     popd
     # build container hosting our functions
@@ -270,23 +279,23 @@ function deploy_function_handlers() {
     az functionapp config appsettings set \
         --name ${FUNCS_APP} \
         --resource-group ${RESOURCE_GROUP} \
-        --settings SB_SEND_TOPIC_SUBSCRIPTION=${SB_SEND_TOPIC_SUBSCRIPTION}
+        --settings SB_SEND_SUBSCRIPTION=${SB_SEND_SUBSCRIPTION}
     az functionapp config appsettings set \
         --name ${FUNCS_APP} \
         --resource-group ${RESOURCE_GROUP} \
-        --settings SB_DISPATCH_TOPIC_SUBSCRIPTION=${SB_DISPATCH_TOPIC_SUBSCRIPTION}
+        --settings SB_DISPATCH_SUBSCRIPTION=${SB_DISPATCH_SUBSCRIPTION}
     az functionapp config appsettings set \
         --name ${FUNCS_APP} \
         --resource-group ${RESOURCE_GROUP} \
-        --settings SB_RECEIVE_TOPIC_SUBSCRIPTION=${SB_RECEIVE_TOPIC_SUBSCRIPTION}
+        --settings SB_RECEIVE_SUBSCRIPTION=${SB_RECEIVE_SUBSCRIPTION}
     az functionapp config appsettings set \
         --name ${FUNCS_APP} \
         --resource-group ${RESOURCE_GROUP} \
-        --settings SB_PROCESS_TOPIC_SUBSCRIPTION=${SB_PROCESS_TOPIC_SUBSCRIPTION}
+        --settings SB_PROCESS_SUBSCRIPTION=${SB_PROCESS_SUBSCRIPTION}
     az functionapp config appsettings set \
         --name ${FUNCS_APP} \
         --resource-group ${RESOURCE_GROUP} \
-        --settings SB_TRANSFORM_TOPIC_SUBSCRIPTION=${SB_TRANSFORM_TOPIC_SUBSCRIPTION}
+        --settings SB_TRANSFORM_SUBSCRIPTION=${SB_TRANSFORM_SUBSCRIPTION}
 
     # getting additional info from newly created function  app
     echo "enabling function diagnostics: ${FUNCS_APP}"
@@ -319,7 +328,7 @@ function publish_function_handlers() {
 
     # push
     echo "pushing container image ${FUNCS_REMOTE_IMAGE} to ${CONTAINER_REGISTRY}"
-    docker push ${FUNCS_REMOTE_IMAGE} -q &
+    docker push ${FUNCS_REMOTE_IMAGE} -q
 }
 
 function save_configuration() {
@@ -329,13 +338,15 @@ function save_configuration() {
     sed \
         -e "s|<SB_SEND_TOPIC>|${SB_SEND_TOPIC}|" \
         -e "s|<SB_RECEIVE_TOPIC>|${SB_RECEIVE_TOPIC}|" \
+        -e "s|<SB_DISPATCH_TOPIC>|${SB_DISPATCH_TOPIC}|" \
         -e "s|<SB_PROCESS_TOPIC>|${SB_PROCESS_TOPIC}|" \
         -e "s|<SB_TRANSFORM_TOPIC>|${SB_TRANSFORM_TOPIC}|" \
         -e "s|<SB_CONNECTION_STRING>|${SB_CONNECTION_STRING}|" \
-        -e "s|<SB_SEND_TOPIC_SUBSCRIPTION>|${SB_SEND_TOPIC_SUBSCRIPTION}|" \
-        -e "s|<SB_RECEIVE_TOPIC_SUBSCRIPTION>|${SB_RECEIVE_TOPIC_SUBSCRIPTION}|" \
-        -e "s|<SB_PROCESS_TOPIC_SUBSCRIPTION>|${SB_PROCESS_TOPIC_SUBSCRIPTION}|" \
-        -e "s|<SB_TRANSFORM_TOPIC_SUBSCRIPTION>|${SB_TRANSFORM_TOPIC_SUBSCRIPTION}|" \
+        -e "s|<SB_SEND_SUBSCRIPTION>|${SB_SEND_SUBSCRIPTION}|" \
+        -e "s|<SB_RECEIVE_SUBSCRIPTION>|${SB_RECEIVE_SUBSCRIPTION}|" \
+        -e "s|<SB_DISPATCH_SUBSCRIPTION>|${SB_DISPATCH_SUBSCRIPTION}|" \
+        -e "s|<SB_PROCESS_SUBSCRIPTION>|${SB_PROCESS_SUBSCRIPTION}|" \
+        -e "s|<SB_TRANSFORM_SUBSCRIPTION>|${SB_TRANSFORM_SUBSCRIPTION}|" \
         configuration.template.js > configuration.js
     popd    
 }
@@ -402,10 +413,12 @@ elif [ "${COMMAND}" == "deploy" ]; then
     deploy_resource_group
     # deploy container registry
     deploy_container_registry
+    # set proper context
+    set_container_context
     # build function handlers
     build_function_handlers
     # publish function handlers
-    publish_function_handlers
+    publish_function_handlers &
     # deploy service bus
     deploy_service_bus
     # deploy function handlers
@@ -414,4 +427,11 @@ elif [ "${COMMAND}" == "deploy" ]; then
     save_configuration
     # test deployment
     # test_deployment
+elif [ "${COMMAND}" == "update" ]; then
+    # set proper context
+    set_container_context
+    # build function handlers
+    build_function_handlers
+    # publish function handlers
+    publish_function_handlers
 fi

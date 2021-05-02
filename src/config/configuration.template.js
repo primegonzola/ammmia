@@ -3,13 +3,15 @@ module.exports = {
     topics: {
         send: "<SB_SEND_TOPIC>",
         receive: "<SB_RECEIVE_TOPIC>",
+        dispatch: "<SB_DISPATCH_TOPIC>",
         process: "<SB_PROCESS_TOPIC>",
         transform: "<SB_TRANSFORM_TOPIC>"
     },
     subscriptions: {
-        send: "<SB_SEND_TOPIC_SUBSCRIPTION>",
-        receive: "<SB_RECEIVE_TOPIC_SUBSCRIPTION>",
-        process: "<SB_PROCESS_TOPIC_SUBSCRIPTION>",
-        transform: "<SB_TRANSFORM_TOPIC_SUBSCRIPTION>"
+        send: "<SB_SEND_SUBSCRIPTION>",
+        receive: "<SB_RECEIVE_SUBSCRIPTION>",
+        dispatch: "<SB_DISPATCH_SUBSCRIPTION>",
+        process: "<SB_PROCESS_SUBSCRIPTION>",
+        transform: "<SB_TRANSFORM_SUBSCRIPTION>"
     }
 }
