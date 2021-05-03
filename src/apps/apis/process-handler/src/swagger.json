@@ -19,8 +19,8 @@
         }
     ],
     "tags": [{
-        "name": "Cats",
-        "description": "API for cats in the system"
+        "name": "Messages",
+        "description": "API for messages in the system"
     }],
     "consumes": [
         "application/json"
@@ -29,33 +29,33 @@
         "application/json"
     ],
     "paths": {
-        "/cats": {
+        "/messages": {
             "get": {
                 "tags": [
-                    "Cats"
+                    "Messages"
                 ],
-                "summary": "Get all cats in system",
+                "summary": "Get all messages in system",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/Cats"
+                            "$ref": "#/definitions/Messages"
                         }
                     }
                 }
             },
             "post": {
                 "tags": [
-                    "Cats"
+                    "Messages"
                 ],
-                "summary": "Create a new cat in system",
+                "summary": "Create a new message in system",
                 "requestBody": {
-                    "description": "Cat Object",
+                    "description": "Message Object",
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/definitions/Cat"
+                                "$ref": "#/definitions/Message"
                             }
                         }
                     }
@@ -76,24 +76,24 @@
                 }
             }
         },
-        "/cats/{id}": {
+        "/messages/{id}": {
             "parameters": [{
                 "name": "id",
                 "in": "path",
                 "required": true,
-                "description": "ID of the cat that we want to match",
+                "description": "ID of the message that we want to match",
                 "type": "string"
             }],
             "get": {
                 "tags": [
-                    "Cats"
+                    "Messages"
                 ],
-                "summary": "Get cat with given ID",
+                "summary": "Get message with given ID",
                 "parameters": [{
                     "in": "path",
                     "name": "id",
                     "required": true,
-                    "description": "Cat with id",
+                    "description": "Message with id",
                     "schema": {
                         "$ref": "#/definitions/id"
                     }
@@ -102,26 +102,26 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/Cat"
+                            "$ref": "#/definitions/Message"
                         }
                     },
                     "404": {
-                        "description": "Failed. Cat not found."
+                        "description": "Failed. Message not found."
                     }
                 }
             },
             "put": {
-                "summary": "Update cat with given ID",
+                "summary": "Update message with given ID",
                 "tags": [
-                    "Cats"
+                    "Messages"
                 ],
                 "requestBody": {
-                    "description": "Cat Object",
+                    "description": "Messages Object",
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/definitions/Cat"
+                                "$ref": "#/definitions/Message"
                             }
                         }
                     }
@@ -130,7 +130,7 @@
                     "in": "path",
                     "name": "id",
                     "required": true,
-                    "description": "Cat with new values of properties",
+                    "description": "Message with new values of properties",
                     "schema": {
                         "$ref": "#/definitions/id"
                     }
@@ -139,27 +139,27 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/Cat"
+                            "$ref": "#/definitions/Message"
                         }
                     },
                     "400": {
                         "description": "Failed. Bad post data."
                     },
                     "404": {
-                        "description": "Failed. Cat not found."
+                        "description": "Failed. Message not found."
                     }
                 }
             },
             "delete": {
-                "summary": "Delete cat with given ID",
+                "summary": "Delete message with given ID",
                 "tags": [
-                    "Cats"
+                    "Messages"
                 ],
                 "parameters": [{
                     "in": "path",
                     "name": "id",
                     "required": true,
-                    "description": "Delete Cat with id",
+                    "description": "Delete Message with id",
                     "schema": {
                         "$ref": "#/definitions/id"
                     }
@@ -172,7 +172,7 @@
                         }
                     },
                     "404": {
-                        "description": "Failed. Cat not found."
+                        "description": "Failed. Message not found."
                     }
                 }
             }
@@ -186,30 +186,27 @@
                 }
             }
         },
-        "Cat": {
+        "Message": {
             "type": "object",
             "properties": {
-                "genus": {
+                "id": {
                     "type": "string"
                 },
-                "name": {
+                "command": {
                     "type": "string"
                 },
-                "isHungry": {
-                    "type": "boolean"
-                },
-                "lastFedDate": {
+                "data": {
                     "type": "string"
                 }
             }
         },
-        "Cats": {
+        "Messages": {
             "type": "object",
             "properties": {
-                "cats": {
+                "messages": {
                     "type": "object",
                     "additionalProperties": {
-                        "$ref": "#/definitions/Cat"
+                        "$ref": "#/definitions/Message"
                     }
                 }
             }
