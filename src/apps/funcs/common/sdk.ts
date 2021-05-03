@@ -1,7 +1,7 @@
 import { Utils } from "../common/utils";
 import { ServiceBusClient, ServiceBusMessage } from "@azure/service-bus";
 
-export class SdkMessage {
+export class ClientMessage {
     public readonly id: string;
     public readonly service: string;
     public readonly command: string;
@@ -14,7 +14,7 @@ export class SdkMessage {
         this.data = data;
     }
 
-    public static serialize(instance: SdkMessage): any {
+    public static serialize(instance: ClientMessage): any {
         return JSON.stringify({
             id: instance.id,
             service: instance.service,
@@ -23,11 +23,11 @@ export class SdkMessage {
         });
     }
 
-    public static deserialize(data: string): SdkMessage {
+    public static deserialize(data: string): ClientMessage {
         // read incoming
         const instance = JSON.parse(data);
         // construct
-        return new SdkMessage(
+        return new ClientMessage(
             instance.id,
             instance.service,
             instance.dommand,
@@ -56,6 +56,15 @@ export class RelayMessage {
             to: instance.to,
             data: instance.data
         });
+    }
+    public static read(instance: any): RelayMessage {
+        // construct
+        return new RelayMessage(
+            instance.id,
+            instance.from,
+            instance.to,
+            instance.data
+        );
     }
 
     public static deserialize(data: string): RelayMessage {
@@ -155,7 +164,7 @@ export class Sdk {
             message.id);
         // send our message
         await sender.sendMessages({
-            body: JSON.stringify(message)
+            body: message
         });
 
         // all done
@@ -170,7 +179,7 @@ export class Sdk {
         console.log("sending message for topic " + topic);
         // send our message
         await sender.sendMessages({
-            body: RelayMessage.serialize(message)
+            body: message
         });
 
         // all done

@@ -1,0 +1,99 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Extract_Payload": {
+                "inputs": {
+                    "payload": "@json(base64ToString(triggerBody()?['ContentData']))"
+                },
+                "runAfter": {},
+                "type": "Compose"
+            },
+            "Send_message": {
+                "inputs": {
+                    "body": {
+                        "ContentData": "@{base64(outputs('Transform_Payload'))}"
+                    },
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['servicebus']['connectionId']"
+                        }
+                    },
+                    "method": "post",
+                    "path": "/@{encodeURIComponent(encodeURIComponent('<SB_DISPATCH_TOPIC>'))}/messages",
+                    "queries": {
+                        "systemProperties": "None"
+                    }
+                },
+                "runAfter": {
+                    "Transform_Payload": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "ApiConnection"
+            },
+            "Transform_Payload": {
+                "inputs": {
+                    "data": {
+                        "command": "@outputs('Extract_Payload').payload.data.command",
+                        "data": "@toUpper(outputs('Extract_Payload').payload.data.data)",
+                        "id": "@outputs('Extract_Payload').payload.data.id",
+                        "invoke": "@outputs('Extract_Payload').payload.data.invoke",
+                        "service": "@outputs('Extract_Payload').payload.data.service"
+                    },
+                    "from": "transform",
+                    "id": "@guid()",
+                    "to": "dispatch"
+                },
+                "runAfter": {
+                    "Extract_Payload": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Compose"
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "parameters": {
+            "$connections": {
+                "defaultValue": {},
+                "type": "Object"
+            }
+        },
+        "triggers": {
+            "Read_Message": {
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['servicebus']['connectionId']"
+                        }
+                    },
+                    "method": "get",
+                    "path": "/@{encodeURIComponent(encodeURIComponent('<SB_TRANSFORM_TOPIC>'))}/subscriptions/@{encodeURIComponent('<SB_TRANSFORM_SUBSCRIPTION>')}/messages/batch/head",
+                    "queries": {
+                        "maxMessageCount": 20,
+                        "subscriptionType": "Main"
+                    }
+                },
+                "recurrence": {
+                    "frequency": "Second",
+                    "interval": 1
+                },
+                "splitOn": "@triggerBody()",
+                "type": "ApiConnection"
+            }
+        }
+    },
+    "parameters": {
+        "$connections": {
+            "value": {
+                "servicebus": {
+                    "connectionId": "<CONNECTION_ID>",
+                    "connectionName": "servicebus",
+                    "id": "/subscriptions/<SUBSCRIPTION_ID>/providers/Microsoft.Web/locations/<LOCATION>/managedApis/servicebus"
+                }
+            }
+        }
+    }
+}

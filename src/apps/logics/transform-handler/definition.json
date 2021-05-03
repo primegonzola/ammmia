@@ -1,0 +1,99 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Extract_Payload": {
+                "inputs": {
+                    "payload": "@json(base64ToString(triggerBody()?['ContentData']))"
+                },
+                "runAfter": {},
+                "type": "Compose"
+            },
+            "Send_message": {
+                "inputs": {
+                    "body": {
+                        "ContentData": "@{base64(outputs('Transform_Payload'))}"
+                    },
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['servicebus']['connectionId']"
+                        }
+                    },
+                    "method": "post",
+                    "path": "/@{encodeURIComponent(encodeURIComponent('dispach-topic-1620065083'))}/messages",
+                    "queries": {
+                        "systemProperties": "None"
+                    }
+                },
+                "runAfter": {
+                    "Transform_Payload": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "ApiConnection"
+            },
+            "Transform_Payload": {
+                "inputs": {
+                    "data": {
+                        "command": "@outputs('Extract_Payload').payload.data.command",
+                        "data": "@toUpper(outputs('Extract_Payload').payload.data.data)",
+                        "id": "@outputs('Extract_Payload').payload.data.id",
+                        "invoke": "@outputs('Extract_Payload').payload.data.invoke",
+                        "service": "@outputs('Extract_Payload').payload.data.service"
+                    },
+                    "from": "transform",
+                    "id": "@guid()",
+                    "to": "dispatch"
+                },
+                "runAfter": {
+                    "Extract_Payload": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Compose"
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "parameters": {
+            "$connections": {
+                "defaultValue": {},
+                "type": "Object"
+            }
+        },
+        "triggers": {
+            "Read_Message": {
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['servicebus']['connectionId']"
+                        }
+                    },
+                    "method": "get",
+                    "path": "/@{encodeURIComponent(encodeURIComponent('transform-topic-1620065083'))}/subscriptions/@{encodeURIComponent('transform-subscription-1620065083')}/messages/batch/head",
+                    "queries": {
+                        "maxMessageCount": 20,
+                        "subscriptionType": "Main"
+                    }
+                },
+                "recurrence": {
+                    "frequency": "Second",
+                    "interval": 1
+                },
+                "splitOn": "@triggerBody()",
+                "type": "ApiConnection"
+            }
+        }
+    },
+    "parameters": {
+        "$connections": {
+            "value": {
+                "servicebus": {
+                    "connectionId": "/subscriptions/886b84e6-68e5-4a4d-8230-61235c4a2087/resourceGroups/ammmia-1620065083/providers/Microsoft.Web/connections/ammmia-sbc-1620065083",
+                    "connectionName": "servicebus",
+                    "id": "/subscriptions/886b84e6-68e5-4a4d-8230-61235c4a2087/providers/Microsoft.Web/locations/westeurope/managedApis/servicebus"
+                }
+            }
+        }
+    }
+}

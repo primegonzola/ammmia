@@ -6,19 +6,10 @@ const connectionString = config.connection;
 const topicName = config.topics.send;
 
 const json_message = {
+    id: "",
     service: "http://iban-validator",
     command: "validate",
     invoke: "0",
-    routing: {
-        index: 0,
-        routes: [{
-            from: "client",
-            to: "send"
-        }, {
-            from: "send",
-            to: "transform"
-        }]
-    },
     data: "AAAA-BBBB-CCCC-DDDD-EEEE"
 };
 
@@ -60,11 +51,12 @@ async function main() {
         let batch = await sender.createMessageBatch();
         for (let i = 0; i < messages.length; i++) {
             // for each message in the array			
+            json_message.id = "aaaaa-aababba-sjsjsjs-" + Date.now();
             json_message.invoke = i.toString();
-            json_message.data = "AAAA-" + i.toString();
+            json_message.data = "aaaaaa-" + i.toString();
             // set message
             const message = {
-                body: JSON.stringify(json_message)
+                body: json_message
             };
             // try to add the message to the batch
             if (!batch.tryAddMessage(message)) {

@@ -43,3 +43,4 @@ __pycache__/
 *$py.class
 
 /send-handler/function.json
+/dispatch-handler/function.json

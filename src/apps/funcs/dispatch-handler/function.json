@@ -3,8 +3,8 @@
         "name": "message",
         "type": "serviceBusTrigger",
         "direction": "in",
-        "topicName": "dispach-topic-1619995796",
-        "subscriptionName": "dispatch-subscription-1619995796",
+        "topicName": "dispach-topic-1620065083",
+        "subscriptionName": "dispatch-subscription-1620065083",
         "connection": "SB_CONNECTION_STRING"
     }],
     "scriptFile": "../dist/dispatch-handler/index.js"

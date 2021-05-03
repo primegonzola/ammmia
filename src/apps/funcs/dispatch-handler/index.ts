@@ -9,7 +9,7 @@ const serviceBusTopicTrigger: AzureFunction = async function (context: Context, 
     const sdk = new Sdk();
 
     // get source
-    const source = RelayMessage.deserialize(message);
+    const source = RelayMessage.read(message);
 
     // check the from
     switch (source.from) {

@@ -11,6 +11,7 @@ if [ "${COMMAND}" == "update" ]; then
     UNIQUE_FIX="${2}"
 fi
 
+SUBSCRIPTION_ID=$(az account show | jq -r .id)
 RESOURCE_GROUP=${PROJECT}-${UNIQUE_FIX}
 SB_NAMESPACE=${PROJECT}-sbns-${UNIQUE_FIX}
 SB_SEND_TOPIC="send-topic"-${UNIQUE_FIX}
@@ -19,6 +20,7 @@ SB_RECEIVE_TOPIC="receive-topic"-${UNIQUE_FIX}
 SB_PROCESS_TOPIC="process-topic"-${UNIQUE_FIX}
 SB_TRANSFORM_TOPIC="transform-topic"-${UNIQUE_FIX}
 SB_CONNECTION_STRING=""
+SB_CONNECTION_NAME=${PROJECT}-sbc-${UNIQUE_FIX}
 SB_SEND_SUBSCRIPTION="send-subscription"-${UNIQUE_FIX}
 SB_DISPATCH_SUBSCRIPTION="dispatch-subscription"-${UNIQUE_FIX}
 SB_RECEIVE_SUBSCRIPTION="receive-subscription"-${UNIQUE_FIX}
@@ -31,6 +33,8 @@ FUNCS_REMOTE_IMAGE="<unknown-image>"
 FUNCS_APP=${PROJECT}-fn-app-${UNIQUE_FIX}
 FUNCS_APP_PLAN=${PROJECT}-fn-asp-${UNIQUE_FIX}
 FUNCS_STORAGE_ACCOUNT=${PROJECT}sa${UNIQUE_FIX}
+LOGIC_TRANSFORM=${PROJECT}-lg-app-${UNIQUE_FIX}
+LOGIC_TRANSFORM_DEPLOYMENT=${PROJECT}-lg-app-deployment-${UNIQUE_FIX}
 
 function deploy_resource_group() {
     # create resource group
@@ -97,7 +101,6 @@ function deploy_service_bus() {
         --namespace-name ${SB_NAMESPACE} \
         --topic-name ${SB_SEND_TOPIC} \
         --max-delivery-count 10 \
-        --auto-delete-on-idle PT10M \
         --default-message-time-to-live PT10M \
         --name ${SB_SEND_SUBSCRIPTION}
 
@@ -107,7 +110,6 @@ function deploy_service_bus() {
         --namespace-name ${SB_NAMESPACE} \
         --topic-name ${SB_DISPATCH_TOPIC} \
         --max-delivery-count 10 \
-        --auto-delete-on-idle PT10M \
         --default-message-time-to-live PT10M \
         --name ${SB_DISPATCH_SUBSCRIPTION}
 
@@ -117,7 +119,6 @@ function deploy_service_bus() {
         --namespace-name ${SB_NAMESPACE} \
         --topic-name ${SB_RECEIVE_TOPIC} \
         --max-delivery-count 10 \
-        --auto-delete-on-idle PT10M \
         --default-message-time-to-live PT10M \
         --name ${SB_RECEIVE_SUBSCRIPTION}
 
@@ -127,7 +128,6 @@ function deploy_service_bus() {
         --namespace-name ${SB_NAMESPACE} \
         --topic-name ${SB_PROCESS_TOPIC} \
         --max-delivery-count 10 \
-        --auto-delete-on-idle PT10M \
         --default-message-time-to-live PT10M \
         --name ${SB_PROCESS_SUBSCRIPTION}
 
@@ -137,7 +137,6 @@ function deploy_service_bus() {
         --namespace-name ${SB_NAMESPACE} \
         --topic-name ${SB_TRANSFORM_TOPIC} \
         --max-delivery-count 10 \
-        --auto-delete-on-idle PT10M \
         --default-message-time-to-live PT10M \
         --name ${SB_TRANSFORM_SUBSCRIPTION}
 }
@@ -167,6 +166,65 @@ function set_container_context() {
     FUNCS_REMOTE_IMAGE=${ACR_LOGIN_SERVER}/${FUNCS_IMAGE};
     # extract 
     CONTAINER_REGISTRY_ID=$(az acr show --name ${CONTAINER_REGISTRY} | jq -r ".id")
+}
+
+function deploy_logic_handlers() {
+    pushd ../apps/logics
+
+    # replace where needed
+    pushd ./transform-handler
+
+    # Transform logic app
+    echo "creating logic app: ${LOGIC_TRANSFORM}"
+    az logic workflow create \
+        -g ${RESOURCE_GROUP} \
+        -l ${LOCATION} \
+        -n ${LOGIC_TRANSFORM} \
+        --definition "./definition.json"
+    popd
+    
+    # all done
+    popd
+}
+
+
+function build_logic_handlers() {
+    pushd ../apps/logics
+
+    # replace where needed
+    pushd ./transform-handler
+
+    # replace
+    sed \
+        -e "s|<SB_CONNECTION_NAME>|${SB_CONNECTION_NAME}|" \
+        -e "s|<SB_CONNECTION_STRING>|${SB_CONNECTION_STRING}|" \
+        parameters.template.json > parameters.json
+    # deploy connection
+    echo "creating api connection for app: ${LOGIC_TRANSFORM}"
+    az deployment group create \
+        -g ${RESOURCE_GROUP} \
+        -f ./connection.json \
+        -n ${LOGIC_TRANSFORM_DEPLOYMENT} \
+        --parameters @parameters.json
+
+    # extract location
+    LOGIC_TRANSFORM_CONNECTION_ID=$(az resource show \
+        --resource-group ${RESOURCE_GROUP} \
+        --resource-type "Microsoft.Web/connections" \
+        --name ${SB_CONNECTION_NAME} | jq -r .id)
+    # replace
+    sed \
+        -e "s|<SB_DISPATCH_TOPIC>|${SB_DISPATCH_TOPIC}|" \
+        -e "s|<SB_TRANSFORM_TOPIC>|${SB_TRANSFORM_TOPIC}|" \
+        -e "s|<SB_DISPATCH_SUBSCRIPTION>|${SB_DISPATCH_SUBSCRIPTION}|" \
+        -e "s|<SB_TRANSFORM_SUBSCRIPTION>|${SB_TRANSFORM_SUBSCRIPTION}|" \
+        -e "s|<CONNECTION_ID>|${LOGIC_TRANSFORM_CONNECTION_ID}|" \
+        -e "s|<SUBSCRIPTION_ID>|${SUBSCRIPTION_ID}|" \
+        -e "s|<LOCATION>|${LOCATION}|" \
+        definition.template.json > definition.json
+    popd
+    # all done
+    popd
 }
 
 function build_function_handlers() {
@@ -415,14 +473,18 @@ elif [ "${COMMAND}" == "deploy" ]; then
     deploy_container_registry
     # set proper context
     set_container_context
-    # build function handlers
-    build_function_handlers
-    # publish function handlers
-    publish_function_handlers
     # deploy service bus
     deploy_service_bus
+    # build function handlers
+    build_function_handlers
+    # build logic handlers
+    build_logic_handlers
+    # publish function handlers
+    publish_function_handlers
     # deploy function handlers
     deploy_function_handlers
+    # deploy logic handlers
+    deploy_logic_handlers
     # all completed lock down security
     save_configuration
     # test deployment
