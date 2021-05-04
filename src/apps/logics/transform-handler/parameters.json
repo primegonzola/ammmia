@@ -6,10 +6,10 @@
             "value": "servicebus"
         },
         "connection_name": {
-            "value": "ammmia-sbc-1620065083"
+            "value": "ammmia-sbc-1620147882"
         },
         "connection_string": {
-            "value": "Endpoint=sb://ammmia-sbns-1620065083.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=NQz+eikDeVue92RymlBRwnL0U5zrjM+KI8aQOYg/cHE="
+            "value": "Endpoint=sb://ammmia-sbns-1620147882.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=HtIVS6ITSiQIklCOk5VK2pHuDBK+B7F5Z8l0pZEf/Og="
         }
     }
 }

@@ -35,6 +35,10 @@ FUNCS_APP_PLAN=${PROJECT}-fn-asp-${UNIQUE_FIX}
 FUNCS_STORAGE_ACCOUNT=${PROJECT}sa${UNIQUE_FIX}
 LOGIC_TRANSFORM=${PROJECT}-lg-app-${UNIQUE_FIX}
 LOGIC_TRANSFORM_DEPLOYMENT=${PROJECT}-lg-app-deployment-${UNIQUE_FIX}
+PROCESS_API_IMAGE=${PROJECT}-process-api:v1.0
+PROCESS_API_REMOTE_IMAGE="<unknown-image>"
+PROCESS_API_APP=${PROJECT}-api-app-${UNIQUE_FIX}
+PROCESS_API_APP_PLAN=${PROJECT}-api-asp-${UNIQUE_FIX}
 
 function deploy_resource_group() {
     # create resource group
@@ -164,6 +168,7 @@ function set_container_context() {
         --output json | jq -r ".[].acrLoginServer")
     # extract 
     FUNCS_REMOTE_IMAGE=${ACR_LOGIN_SERVER}/${FUNCS_IMAGE};
+    PROCESS_API_REMOTE_IMAGE=${ACR_LOGIN_SERVER}/${PROCESS_API_IMAGE};
     # extract 
     CONTAINER_REGISTRY_ID=$(az acr show --name ${CONTAINER_REGISTRY} | jq -r ".id")
 }
@@ -409,6 +414,221 @@ function save_configuration() {
     popd    
 }
 
+function build_api_handlers() {
+    pushd ../apps/apis
+    # replace where needed
+    pushd ./api-handler
+    # sed \
+    #     -e "s|<SB_SEND_TOPIC>|${SB_SEND_TOPIC}|" \
+    #     -e "s|<SB_SEND_SUBSCRIPTION>|${SB_SEND_SUBSCRIPTION}|" \
+    #     function.template.json > function.json
+
+        # build container hosting our functions
+        # docker build -t ${PROCESS_API_IMAGE} .
+    popd
+    popd
+}
+
+function deploy_api_handlers() {
+    # get acr credentials
+    echo "retrieving container register credentials: ${CONTAINER_REGISTRY}"
+    ACR_USER=$(az acr credential show \
+        --name ${CONTAINER_REGISTRY} \
+        --output json | jq -r ".username")
+    ACR_PASSWORD=$(az acr credential show \
+        --name ${CONTAINER_REGISTRY} \
+        --output json | jq -r ".passwords[0].value")
+    
+    # create plan
+    echo "creating api app plan: ${PROCESS_API_APP_PLAN}"
+    az appservice plan create \
+        --resource-group ${RESOURCE_GROUP} \
+        --name ${PROCESS_API_APP_PLAN} \
+        --location ${LOCATION} \
+        --number-of-workers 1 \
+        --sku P2V3 \
+        --is-linux
+    
+    # create function app running a system owned identity 
+    echo "creating api app: ${PROCESS_API_APP}"
+    # az webapp create \
+    #     --name ${PROCESS_API_APP} \
+    #     --assign-identity [system] \
+    #     --resource-group ${RESOURCE_GROUP} \
+    #     --plan ${PROCESS_API_APP_PLAN} \
+    #     --deployment-container-image-name ${PROCESS_API_REMOTE_IMAGE} \
+    #     --docker-registry-server-user ${ACR_USER} \
+    #     --docker-registry-server-password ${ACR_PASSWORD}
+
+    az webapp create \
+        --name ${PROCESS_API_APP} \
+        --assign-identity [system] \
+        --resource-group ${RESOURCE_GROUP} \
+        --plan ${PROCESS_API_APP_PLAN} \
+        --runtime "node|12-lts" \
+        --deployment-local-git
+
+    # setting configuration
+    echo "applying settings to functions app: ${PROCESS_API_APP_PLAN}"
+    # az webapp config appsettings set \
+    #     --name ${PROCESS_API_APP} \
+    #     --resource-group ${RESOURCE_GROUP} \
+    #     --settings WEBSITES_PORT=3000
+
+    # service bus connection string
+    az webapp config appsettings set \
+        --name ${PROCESS_API_APP} \
+        --resource-group ${RESOURCE_GROUP} \
+        --settings SB_CONNECTION_STRING=${SB_CONNECTION_STRING}
+    # topics
+    az webapp config appsettings set \
+        --name ${PROCESS_API_APP} \
+        --resource-group ${RESOURCE_GROUP} \
+        --settings SB_SEND_TOPIC=${SB_SEND_TOPIC}
+    az webapp config appsettings set \
+        --name ${PROCESS_API_APP} \
+        --resource-group ${RESOURCE_GROUP} \
+        --settings SB_DISPATCH_TOPIC=${SB_DISPATCH_TOPIC}
+    az webapp config appsettings set \
+        --name ${PROCESS_API_APP} \
+        --resource-group ${RESOURCE_GROUP} \
+        --settings SB_RECEIVE_TOPIC=${SB_RECEIVE_TOPIC}
+    az webapp config appsettings set \
+        --name ${PROCESS_API_APP} \
+        --resource-group ${RESOURCE_GROUP} \
+        --settings SB_PROCESS_TOPIC=${SB_PROCESS_TOPIC}
+    az webapp config appsettings set \
+        --name ${PROCESS_API_APP} \
+        --resource-group ${RESOURCE_GROUP} \
+        --settings SB_TRANSFORM_TOPIC=${SB_TRANSFORM_TOPIC}
+
+    # subscriptions
+    az webapp config appsettings set \
+        --name ${PROCESS_API_APP} \
+        --resource-group ${RESOURCE_GROUP} \
+        --settings SB_SEND_SUBSCRIPTION=${SB_SEND_SUBSCRIPTION}
+    az webapp config appsettings set \
+        --name ${PROCESS_API_APP} \
+        --resource-group ${RESOURCE_GROUP} \
+        --settings SB_DISPATCH_SUBSCRIPTION=${SB_DISPATCH_SUBSCRIPTION}
+    az webapp config appsettings set \
+        --name ${PROCESS_API_APP} \
+        --resource-group ${RESOURCE_GROUP} \
+        --settings SB_RECEIVE_SUBSCRIPTION=${SB_RECEIVE_SUBSCRIPTION}
+    az webapp config appsettings set \
+        --name ${PROCESS_API_APP} \
+        --resource-group ${RESOURCE_GROUP} \
+        --settings SB_PROCESS_SUBSCRIPTION=${SB_PROCESS_SUBSCRIPTION}
+    az webapp config appsettings set \
+        --name ${PROCESS_API_APP} \
+        --resource-group ${RESOURCE_GROUP} \
+        --settings SB_TRANSFORM_SUBSCRIPTION=${SB_TRANSFORM_SUBSCRIPTION}
+
+    # getting additional info from newly created function  app
+    echo "enabling function diagnostics: ${PROCESS_API_APP}"
+    az webapp log config \
+        --resource-group ${RESOURCE_GROUP} \
+        --name ${PROCESS_API_APP} \
+        --docker-container-logging filesystem \
+        --application-logging filesystem
+
+    # getting additional info from newly created function  app
+    echo "getting additionals settings from functions app: ${PROCESS_API_APP_PLAN}"
+    PROCESS_API_PRINCIPAL_ID=$(az webapp show \
+        --resource-group ${RESOURCE_GROUP} \
+        --name ${PROCESS_API_APP} \
+        --output json | jq -r ".identity.principalId")
+
+    echo "setting security for functions app: ${PROCESS_API_APP_PLAN}"
+    az role assignment create \
+        --role AcrPull \
+        --assignee-principal-type ServicePrincipal \
+        --assignee-object-id ${PROCESS_API_PRINCIPAL_ID} \
+        --scope ${CONTAINER_REGISTRY_ID}  
+}
+
+function publish_api_handlers() {
+    
+    pushd ../apps/apis
+    # replace where needed
+    pushd ./api-handler
+    # get setings
+    GIT_URI=$(az webapp deployment source config-local-git \
+        -g ${RESOURCE_GROUP} \
+        -n ${PROCESS_API_APP} | jq -r .url)
+    GIT_USER=$(az webapp deployment list-publishing-credentials \
+        -g ${RESOURCE_GROUP} \
+        -n ${PROCESS_API_APP} | jq -r .publishingUserName)
+    GIT_PASSWORD=$(az webapp deployment list-publishing-credentials \
+        -g ${RESOURCE_GROUP} \
+        -n ${PROCESS_API_APP} | jq -r .publishingPassword)
+
+    pushd ..
+
+    rm -rf output
+    mkdir -vp output && cd output
+
+    # clone repo
+    git clone https://${GIT_USER}:${GIT_PASSWORD}@${PROCESS_API_APP}.scm.azurewebsites.net/${PROCESS_API_APP}.git
+
+    # go into dir
+    cd ${PROCESS_API_APP}
+
+    # configure
+    git config user.name ${GIT_USER}
+    git config user.email ${GIT_USER}@${PROCESS_API_APP}
+
+    # set simple push model
+    git config push.default simple
+
+    # copy all
+    cp -R ../../api-handler/* .
+
+# override git ignore
+cat <<-EOF > ./.gitignore
+npm-debug.log
+package-lock.json
+node_modules
+*/doc
+*/test
+**/*.sh
+**/*.config.js
+EOF
+    # install
+    npm install
+
+    # build site
+    npm run publish
+    
+    # add changes to repo
+    git add .
+    
+    # commit
+    git commit -m "New deployment"
+
+    # push it
+    git push https://${GIT_USER}:${GIT_PASSWORD}@${PROCESS_API_APP}.scm.azurewebsites.net/${PROCESS_API_APP}.git
+
+    cd ../..
+
+    rm -rf output
+
+    # all done    
+    popd
+
+    popd
+    popd
+
+    # tag
+    # echo "tagging container image ${PROCESS_API_IMAGE} with: ${PROCESS_API_REMOTE_IMAGE}"
+    # docker tag ${PROCESS_API_IMAGE} ${PROCESS_API_REMOTE_IMAGE}
+
+    # # push
+    # echo "pushing container image ${PROCESS_API_REMOTE_IMAGE} to ${CONTAINER_REGISTRY}"
+    # docker push ${PROCESS_API_REMOTE_IMAGE}
+}
+
+
 function test_deployment() {
     echo "testing deployment in ${RESOURCE_GROUP}"
     # command to execute
@@ -473,16 +693,26 @@ elif [ "${COMMAND}" == "deploy" ]; then
     deploy_container_registry
     # set proper context
     set_container_context
+    
     # deploy service bus
     deploy_service_bus
+    
+    # build api handlers
+    build_api_handlers
+    # deploy api handlers
+    deploy_api_handlers
+    # publish api handlers
+    publish_api_handlers
+
     # build function handlers
     build_function_handlers
-    # build logic handlers
-    build_logic_handlers
     # publish function handlers
     publish_function_handlers
     # deploy function handlers
     deploy_function_handlers
+    
+    # build logic handlers
+    build_logic_handlers
     # deploy logic handlers
     deploy_logic_handlers
     # all completed lock down security

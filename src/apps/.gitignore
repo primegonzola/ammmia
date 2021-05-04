@@ -22,9 +22,6 @@ project.lock.json
 appsettings.json
 local.settings.json
 
-node_modules
-dist
-
 # Local python packages
 .python_packages/
 
@@ -41,3 +38,4 @@ venv.bak/
 __pycache__/
 *.py[cod]
 *$py.class
+node_modules
