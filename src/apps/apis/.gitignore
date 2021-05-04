@@ -1,0 +1,7 @@
+npm-debug.log
+package-lock.json
+node_modules
+*/doc
+*/test
+**/*.sh
+**/*.config.js
