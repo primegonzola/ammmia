@@ -23,6 +23,7 @@
         "express": "^4.17.1",
         "swagger-jsdoc": "^7.0.0-rc.6",
         "swagger-ui-express": "^4.1.6",
-        "uuid": "^8.3.2"
+        "uuid": "^8.3.2",
+        "@azure/service-bus": "^7.0.5"
     }
 }
