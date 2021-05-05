@@ -1,5 +1,25 @@
-import { Utils } from "./utils";
-import { ServiceBusClient, ServiceBusMessage } from "@azure/service-bus";
+import {performance} from "perf_hooks";
+import { ServiceBusClient, ServiceBusReceiver } from "@azure/service-bus";
+
+export class Utils {
+    public static uuid(): string {
+        //Timestamp
+        let d = new Date().getTime();
+        //Time in microseconds since page-load or 0 if unsupported        
+        let d2 = (performance && performance.now && (performance.now() * 1000)) || 0;
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+            let r = Math.random() * 16;//random number between 0 and 16
+            if (d > 0) {//Use timestamp until depleted
+                r = (d + r) % 16 | 0;
+                d = Math.floor(d / 16);
+            } else {//Use microseconds since page-load if supported
+                r = (d2 + r) % 16 | 0;
+                d2 = Math.floor(d2 / 16);
+            }
+            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+    }
+}
 
 export class ClientMessage {
     public readonly id: string;
@@ -7,7 +27,7 @@ export class ClientMessage {
     public readonly command: string;
     public readonly data: unknown;
 
-    constructor(id:string, service: string, command: string, data?: unknown) {
+    constructor(id: string, service: string, command: string, data?: unknown) {
         this.id = id || Utils.uuid();
         this.service = service;
         this.command = command;
@@ -186,7 +206,7 @@ export class Sdk {
         sender.close();
     }
 
-    public async receive(topic: TopicOptions, handler: (message: any) => boolean | undefined,
+    public async receive(topic: TopicOptions, handler: (message: any) => Promise<boolean>,
         count = 1, duration = 5000): Promise<void> {
         // check if any handler
         if (handler) {
@@ -194,24 +214,42 @@ export class Sdk {
             const receiver = this.client.createReceiver(
                 this.resolveTopic(topic),
                 this.resolveSubscription(topic))
-            // get messages
-            const messages = await receiver.receiveMessages(count, {
-                maxWaitTimeInMs: duration
-            });
-            // check if any received
-            const handled: Promise<void>[] = [];
-            // loop 
-            messages.forEach(message => {
-                // log
-                console.log("receiving message for topic " + topic);
-                if (handler(message))
-                    handled.push(receiver.completeMessage(message));
-            });
-            // complete handled ones
-            if (handled.length > 0)
-                await Promise.all(handled);
-            // all one
-            receiver.close();
+
+            // routine too execute
+            const rfx = async (rx: ServiceBusReceiver, rh: (message: any) => Promise<boolean>) => {
+                // get messages
+                const messages = await rx.receiveMessages(count, {
+                    maxWaitTimeInMs: duration
+                });
+                // check if anythinh received
+                if (messages && messages.length > 0) {
+                    // check if any received
+                    const handlers = [];
+                    const handled: Promise<void>[] = [];
+                    // loop 
+                    messages.forEach(message => {
+                        // log
+                        console.log("receiving message for topic " + topic);
+                        handlers.push(rh(message));
+                    });
+                    // execute handlers
+                    const completes = await Promise.all(handlers) as boolean[];
+                    for (let i = 0; i < messages.length; i++) {
+                        if (completes[i] === true)
+                            handled.push(receiver.completeMessage(messages[i]))
+                    }
+                    // complete handled ones
+                    if (handled.length > 0)
+                        await Promise.all(handled);
+                }
+
+                // set next loop
+                setTimeout(async () => await rfx(receiver, handler), 100);
+            };
+            // execute
+            await rfx(receiver, handler);
+            // all one o fix later
+            // receiver.close();
         }
     }
 

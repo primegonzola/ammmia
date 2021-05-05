@@ -8,6 +8,8 @@ UNIQUE_FIX=$(date +%s)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 pushd ../.. && ROOT_DIR=$(pwd -P) && popd
 OUTPUT_DIR=${ROOT_DIR}/output
+SDK_DIR=${ROOT_DIR}/src/apps/sdk
+
 # override here
 if [ "${COMMAND}" == "update" ]; then
     UNIQUE_FIX="${2}"
@@ -32,11 +34,11 @@ SB_PROCESS_SUBSCRIPTION="process-subscription"-${UNIQUE_FIX}
 SB_TRANSFORM_SUBSCRIPTION="transform-subscription"-${UNIQUE_FIX}
 CONTAINER_REGISTRY=${PROJECT}acr${UNIQUE_FIX}
 CONTAINER_REGISTRY_ID="<unkown-registry-id>"
-FUNCS_IMAGE=${PROJECT}-funcs:v1.0
-FUNCS_REMOTE_IMAGE="<unknown-image>"
-FUNCS_APP=${PROJECT}-fn-app-${UNIQUE_FIX}
-FUNCS_APP_PLAN=${PROJECT}-fn-asp-${UNIQUE_FIX}
-FUNCS_STORAGE_ACCOUNT=${PROJECT}sa${UNIQUE_FIX}
+FUNCTIONS_IMAGE=${PROJECT}-functions:v1.0
+FUNCTIONS_REMOTE_IMAGE="<unknown-image>"
+FUNCTIONS_APP=${PROJECT}-fn-app-${UNIQUE_FIX}
+FUNCTIONS_APP_PLAN=${PROJECT}-fn-asp-${UNIQUE_FIX}
+FUNCTIONS_STORAGE_ACCOUNT=${PROJECT}sa${UNIQUE_FIX}
 LOGIC_TRANSFORM=${PROJECT}-lg-app-${UNIQUE_FIX}
 PROCESS_API_IMAGE=${PROJECT}-process-api:v1.0
 PROCESS_API_REMOTE_IMAGE="<unknown-image>"
@@ -189,14 +191,14 @@ function set_container_context() {
         --query "[].{acrLoginServer:loginServer}" \
         --output json | jq -r ".[].acrLoginServer")
     # extract 
-    FUNCS_REMOTE_IMAGE=${ACR_LOGIN_SERVER}/${FUNCS_IMAGE};
+    FUNCTIONS_REMOTE_IMAGE=${ACR_LOGIN_SERVER}/${FUNCTIONS_IMAGE};
     PROCESS_API_REMOTE_IMAGE=${ACR_LOGIN_SERVER}/${PROCESS_API_IMAGE};
     # extract 
     CONTAINER_REGISTRY_ID=$(az acr show --name ${CONTAINER_REGISTRY} | jq -r ".id")
 }
 
 function deploy_logic_handlers() {
-    pushd ../apps/logics
+    pushd ../apps/logic-apps
 
     # replace where needed
     pushd ./transform-handler
@@ -216,7 +218,7 @@ function deploy_logic_handlers() {
 
 
 function build_logic_handlers() {
-    pushd ../apps/logics
+    pushd ../apps/logic-apps
 
     # replace where needed
     pushd ./transform-handler
@@ -240,7 +242,12 @@ function publish_logic_handlers() {
 }
 
 function build_function_handlers() {
-    pushd ../apps/funcs
+    pushd ../apps/functions
+
+    # install sdk
+    mkdir -vp common
+    cp ${SCRIPT_DIR}/sdk.ts ./common/
+
     # replace where needed
     pushd ./send-handler
     sed \
@@ -255,7 +262,7 @@ function build_function_handlers() {
         function.template.json > function.json
     popd
     # build container hosting our functions
-    docker build -t ${FUNCS_IMAGE} .
+    docker build -t ${FUNCTIONS_IMAGE} .
     popd
 }
 
@@ -270,54 +277,54 @@ function deploy_function_handlers() {
         --output json | jq -r ".passwords[0].value")
     
     # create the storage account
-    echo "creating storage account: ${FUNCS_STORAGE_ACCOUNT}"
+    echo "creating storage account: ${FUNCTIONS_STORAGE_ACCOUNT}"
     az storage account create \
-        --name ${FUNCS_STORAGE_ACCOUNT} \
+        --name ${FUNCTIONS_STORAGE_ACCOUNT} \
         --location ${LOCATION} \
         --resource-group ${RESOURCE_GROUP} \
         --sku Standard_LRS
 
-    echo "retrieving storage account connection string: ${FUNCS_STORAGE_ACCOUNT}"
-    FUNCS_STORAGE_ACCOUNT_CONNECTION=$(az storage account show-connection-string \
+    echo "retrieving storage account connection string: ${FUNCTIONS_STORAGE_ACCOUNT}"
+    FUNCTIONS_STORAGE_ACCOUNT_CONNECTION=$(az storage account show-connection-string \
         --resource-group ${RESOURCE_GROUP} \
-        --name ${FUNCS_STORAGE_ACCOUNT} \
+        --name ${FUNCTIONS_STORAGE_ACCOUNT} \
         --query connectionString \
         --output tsv)
 
     # create plan
-    echo "creating app plan: ${FUNCS_APP_PLAN}"
+    echo "creating app plan: ${FUNCTIONS_APP_PLAN}"
     az functionapp plan create \
         --resource-group ${RESOURCE_GROUP} \
-        --name ${FUNCS_APP_PLAN} \
+        --name ${FUNCTIONS_APP_PLAN} \
         --location ${LOCATION} \
         --number-of-workers 1 \
         --sku EP1 \
         --is-linux
     
     # create function app running a system owned identity 
-    echo "creating app: ${FUNCS_APP}"
+    echo "creating app: ${FUNCTIONS_APP}"
     az functionapp create \
-        --name ${FUNCS_APP} \
+        --name ${FUNCTIONS_APP} \
         --assign-identity [system] \
-        --storage-account ${FUNCS_STORAGE_ACCOUNT} \
+        --storage-account ${FUNCTIONS_STORAGE_ACCOUNT} \
         --resource-group ${RESOURCE_GROUP} \
-        --plan ${FUNCS_APP_PLAN} \
+        --plan ${FUNCTIONS_APP_PLAN} \
         --os-type Linux \
         --runtime node \
         --functions-version 3 \
         --runtime-version 12 \
-        --deployment-container-image-name ${FUNCS_REMOTE_IMAGE} \
+        --deployment-container-image-name ${FUNCTIONS_REMOTE_IMAGE} \
         --docker-registry-server-user ${ACR_USER} \
         --docker-registry-server-password ${ACR_PASSWORD}
         
     # setting configuration
-    echo "applying settings to app: ${FUNCS_APP_PLAN}"
+    echo "applying settings to app: ${FUNCTIONS_APP_PLAN}"
     # storage connection string
     az functionapp config appsettings set \
-        --name ${FUNCS_APP} \
+        --name ${FUNCTIONS_APP} \
         --resource-group ${RESOURCE_GROUP} \
         --settings \
-        AzureWebJobsStorage=${FUNCS_STORAGE_ACCOUNT_CONNECTION} \
+        AzureWebJobsStorage=${FUNCTIONS_STORAGE_ACCOUNT_CONNECTION} \
         SB_CONNECTION_STRING=${SB_CONNECTION_STRING} \
         SB_SEND_TOPIC=${SB_SEND_TOPIC} \
         SB_DISPATCH_TOPIC=${SB_DISPATCH_TOPIC} \
@@ -331,37 +338,37 @@ function deploy_function_handlers() {
         SB_TRANSFORM_SUBSCRIPTION=${SB_TRANSFORM_SUBSCRIPTION}
 
     # getting additional info from newly created function  app
-    echo "enabling function diagnostics: ${FUNCS_APP}"
+    echo "enabling function diagnostics: ${FUNCTIONS_APP}"
     az webapp log config \
         --resource-group ${RESOURCE_GROUP} \
-        --name ${FUNCS_APP} \
+        --name ${FUNCTIONS_APP} \
         --docker-container-logging filesystem \
         --application-logging filesystem
 
     # getting additional info from newly created function  app
-    echo "getting additionals settings from app: ${FUNCS_APP_PLAN}"
-    FUNCS_PRINCIPAL_ID=$(az functionapp show \
+    echo "getting additionals settings from app: ${FUNCTIONS_APP_PLAN}"
+    FUNCTIONS_PRINCIPAL_ID=$(az functionapp show \
         --resource-group ${RESOURCE_GROUP} \
-        --name ${FUNCS_APP} \
+        --name ${FUNCTIONS_APP} \
         --output json | jq -r ".identity.principalId")
 
-    echo "setting security for app: ${FUNCS_APP_PLAN}"
+    echo "setting security for app: ${FUNCTIONS_APP_PLAN}"
     az role assignment create \
         --role AcrPull \
         --assignee-principal-type ServicePrincipal \
-        --assignee-object-id ${FUNCS_PRINCIPAL_ID} \
+        --assignee-object-id ${FUNCTIONS_PRINCIPAL_ID} \
         --scope ${CONTAINER_REGISTRY_ID}  
 }
 
 function publish_function_handlers() {
     
     # tag
-    echo "tagging container image ${FUNCS_IMAGE} with: ${FUNCS_REMOTE_IMAGE}"
-    docker tag ${FUNCS_IMAGE} ${FUNCS_REMOTE_IMAGE}
+    echo "tagging container image ${FUNCTIONS_IMAGE} with: ${FUNCTIONS_REMOTE_IMAGE}"
+    docker tag ${FUNCTIONS_IMAGE} ${FUNCTIONS_REMOTE_IMAGE}
 
     # push
-    echo "pushing container image ${FUNCS_REMOTE_IMAGE} to ${CONTAINER_REGISTRY}"
-    docker push ${FUNCS_REMOTE_IMAGE}
+    echo "pushing container image ${FUNCTIONS_REMOTE_IMAGE} to ${CONTAINER_REGISTRY}"
+    docker push ${FUNCTIONS_REMOTE_IMAGE}
 }
 
 function save_configuration() {
@@ -388,6 +395,10 @@ function build_api_handlers() {
     pushd ../apps/apis
     # replace where needed
     pushd ./api-handler
+
+    # install sdk
+    cp ${SCRIPT_DIR}/sdk.ts .
+
     # sed \
     #     -e "s|<SB_SEND_TOPIC>|${SB_SEND_TOPIC}|" \
     #     -e "s|<SB_SEND_SUBSCRIPTION>|${SB_SEND_SUBSCRIPTION}|" \
@@ -529,10 +540,9 @@ if [ "${COMMAND}" == "install" ]; then
 elif [ "${COMMAND}" == "generate" ]; then
     # clean up
     pushd ../apps
-    rm -rf funcs
-    func init funcs --worker-runtime node --language typescript --docker
-    cd funcs
-    func new --name test-handler --template "HTTP trigger"
+    rm -rf functions
+    func init functions --worker-runtime node --language typescript --docker
+    cd functions
     func new --name send-handler --template "Azure Service Bus Topic trigger"
     popd
 elif [ "${COMMAND}" == "clean" ]; then
