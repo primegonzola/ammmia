@@ -1,5 +1,5 @@
 import { Utils } from "./utils";
-import { ServiceBusClient, ServiceBusMessage } from "@azure/service-bus";
+import { ServiceBusClient, ServiceBusMessage, ServiceBusReceiver } from "@azure/service-bus";
 
 export class ClientMessage {
     public readonly id: string;
@@ -7,7 +7,7 @@ export class ClientMessage {
     public readonly command: string;
     public readonly data: unknown;
 
-    constructor(id:string, service: string, command: string, data?: unknown) {
+    constructor(id: string, service: string, command: string, data?: unknown) {
         this.id = id || Utils.uuid();
         this.service = service;
         this.command = command;
@@ -186,7 +186,7 @@ export class Sdk {
         sender.close();
     }
 
-    public async receive(topic: TopicOptions, handler: (message: any) => boolean | undefined,
+    public async receive(topic: TopicOptions, handler: (message: any) => Promise<boolean>,
         count = 1, duration = 5000): Promise<void> {
         // check if any handler
         if (handler) {
@@ -194,24 +194,42 @@ export class Sdk {
             const receiver = this.client.createReceiver(
                 this.resolveTopic(topic),
                 this.resolveSubscription(topic))
-            // get messages
-            const messages = await receiver.receiveMessages(count, {
-                maxWaitTimeInMs: duration
-            });
-            // check if any received
-            const handled: Promise<void>[] = [];
-            // loop 
-            messages.forEach(message => {
-                // log
-                console.log("receiving message for topic " + topic);
-                if (handler(message))
-                    handled.push(receiver.completeMessage(message));
-            });
-            // complete handled ones
-            if (handled.length > 0)
-                await Promise.all(handled);
-            // all one
-            receiver.close();
+
+            // routine too execute
+            const rfx = async (rx: ServiceBusReceiver, rh: (message: any) => Promise<boolean>) => {
+                // get messages
+                const messages = await rx.receiveMessages(count, {
+                    maxWaitTimeInMs: duration
+                });
+                // check if anythinh received
+                if (messages && messages.length > 0) {
+                    // check if any received
+                    const handlers = [];
+                    const handled: Promise<void>[] = [];
+                    // loop 
+                    messages.forEach(message => {
+                        // log
+                        console.log("receiving message for topic " + topic);
+                        handlers.push(rh(message));
+                    });
+                    // execute handlers
+                    const completes = await Promise.all(handlers) as boolean[];
+                    for (let i = 0; i < messages.length; i++) {
+                        if (completes[i] === true)
+                            handled.push(receiver.completeMessage(messages[i]))
+                    }
+                    // complete handled ones
+                    if (handled.length > 0)
+                        await Promise.all(handled);
+                }
+
+                // set next loop
+                setTimeout(async () => await rfx(receiver, handler), 100);
+            };
+            // execute
+            await rfx(receiver, handler);
+            // all one o fix later
+            // receiver.close();
         }
     }
 

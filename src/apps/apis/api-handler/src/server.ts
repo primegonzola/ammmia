@@ -1,28 +1,42 @@
 import app from './app'
-import { Sdk, TopicOptions } from "./sdk";
+import { Sdk, TopicOptions, RelayMessage } from "./sdk";
 
 const port = parseInt(process.env.PORT || '3000')
 
 const server = new app().Start(port)
-  .then(port => {
+  .then(async port => {
     console.log(`Server running on port ${port}`);
 
     try {
-      console.log("Creating SDK")
-      // create sdk
+      // setup sdk
       const sdk = new Sdk();
 
       // set up to receive
-      sdk.receive(TopicOptions.Process, (message) => {
-        console.log("receiving message: " + message)
+      console.log("setting up receiver");
+
+      await sdk.receive(TopicOptions.Process, async (message) => {
+        // get source
+        const source = RelayMessage.read(message.body);
+
+        // check the from
+        switch (source.from) {
+          case TopicOptions.Dispatch: {
+            // relay message to transform
+            await sdk.relay(new RelayMessage(
+              undefined,
+              TopicOptions.Process,
+              TopicOptions.Dispatch,
+              source.data
+            ));
+            break;
+          }
+          default:
+            throw new Error("unsupported from: " + source.from);
+        }
 
         // mark as handled
         return true;
       });
-
-      console.log("Disposing SDK")
-      // dispose all
-      sdk.dispose();
     }
     catch (error) {
       console.log("error starting sdk. " + error);

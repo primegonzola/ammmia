@@ -20,7 +20,7 @@
                         }
                     },
                     "method": "post",
-                    "path": "/@{encodeURIComponent(encodeURIComponent('dispach-topic-1620207979'))}/messages",
+                    "path": "/@{encodeURIComponent(encodeURIComponent('dispach-topic-1620211682'))}/messages",
                     "queries": {
                         "systemProperties": "None"
                     }
@@ -70,7 +70,7 @@
                         }
                     },
                     "method": "get",
-                    "path": "/@{encodeURIComponent(encodeURIComponent('transform-topic-1620207979'))}/subscriptions/@{encodeURIComponent('transform-subscription-1620207979')}/messages/batch/head",
+                    "path": "/@{encodeURIComponent(encodeURIComponent('transform-topic-1620211682'))}/subscriptions/@{encodeURIComponent('transform-subscription-1620211682')}/messages/batch/head",
                     "queries": {
                         "maxMessageCount": 20,
                         "subscriptionType": "Main"
@@ -89,7 +89,7 @@
         "$connections": {
             "value": {
                 "servicebus": {
-                    "connectionId": "/subscriptions/886b84e6-68e5-4a4d-8230-61235c4a2087/resourceGroups/ammmia-1620207979/providers/Microsoft.Web/connections/ammmia-sbc-1620207979",
+                    "connectionId": "/subscriptions/886b84e6-68e5-4a4d-8230-61235c4a2087/resourceGroups/ammmia-1620211682/providers/Microsoft.Web/connections/ammmia-sbc-1620211682",
                     "connectionName": "servicebus",
                     "id": "/subscriptions/886b84e6-68e5-4a4d-8230-61235c4a2087/providers/Microsoft.Web/locations/westeurope/managedApis/servicebus"
                 }

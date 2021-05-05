@@ -633,9 +633,9 @@ elif [ "${COMMAND}" == "deploy" ]; then
     deploy_container_registry
     # set proper context
     set_container_context
-    
+
     # deploy service bus
-    # deploy_service_bus
+    deploy_service_bus
     
     # build api handlers
     build_api_handlers
@@ -644,7 +644,6 @@ elif [ "${COMMAND}" == "deploy" ]; then
     # publish api handlers
     publish_api_handlers
 
-    exit
     # build function handlers
     build_function_handlers
     # publish function handlers
@@ -658,8 +657,7 @@ elif [ "${COMMAND}" == "deploy" ]; then
     deploy_logic_handlers
     # all completed lock down security
     save_configuration
-    # test deployment
-    # test_deployment
+    
 elif [ "${COMMAND}" == "update" ]; then
     # set proper context
     set_container_context
