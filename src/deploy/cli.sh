@@ -5,7 +5,9 @@ PROJECT="ammmia"
 LOCATION="westeurope"
 UNIQUE_FIX=${RANDOM}
 UNIQUE_FIX=$(date +%s)
-
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+pushd ../.. && ROOT_DIR=$(pwd -P) && popd
+OUTPUT_DIR=${ROOT_DIR}/output
 # override here
 if [ "${COMMAND}" == "update" ]; then
     UNIQUE_FIX="${2}"
@@ -278,7 +280,7 @@ function deploy_function_handlers() {
         --output tsv)
 
     # create plan
-    echo "creating functions app plan: ${FUNCS_APP_PLAN}"
+    echo "creating app plan: ${FUNCS_APP_PLAN}"
     az functionapp plan create \
         --resource-group ${RESOURCE_GROUP} \
         --name ${FUNCS_APP_PLAN} \
@@ -288,7 +290,7 @@ function deploy_function_handlers() {
         --is-linux
     
     # create function app running a system owned identity 
-    echo "creating functions app: ${FUNCS_APP}"
+    echo "creating app: ${FUNCS_APP}"
     az functionapp create \
         --name ${FUNCS_APP} \
         --assign-identity [system] \
@@ -304,61 +306,24 @@ function deploy_function_handlers() {
         --docker-registry-server-password ${ACR_PASSWORD}
         
     # setting configuration
-    echo "applying settings to functions app: ${FUNCS_APP_PLAN}"
+    echo "applying settings to app: ${FUNCS_APP_PLAN}"
     # storage connection string
     az functionapp config appsettings set \
         --name ${FUNCS_APP} \
         --resource-group ${RESOURCE_GROUP} \
-        --settings AzureWebJobsStorage=${FUNCS_STORAGE_ACCOUNT_CONNECTION}
-    # service bus connection string
-    az functionapp config appsettings set \
-        --name ${FUNCS_APP} \
-        --resource-group ${RESOURCE_GROUP} \
-        --settings SB_CONNECTION_STRING=${SB_CONNECTION_STRING}
-
-    # topics
-    az functionapp config appsettings set \
-        --name ${FUNCS_APP} \
-        --resource-group ${RESOURCE_GROUP} \
-        --settings SB_SEND_TOPIC=${SB_SEND_TOPIC}
-    az functionapp config appsettings set \
-        --name ${FUNCS_APP} \
-        --resource-group ${RESOURCE_GROUP} \
-        --settings SB_DISPATCH_TOPIC=${SB_DISPATCH_TOPIC}
-    az functionapp config appsettings set \
-        --name ${FUNCS_APP} \
-        --resource-group ${RESOURCE_GROUP} \
-        --settings SB_RECEIVE_TOPIC=${SB_RECEIVE_TOPIC}
-    az functionapp config appsettings set \
-        --name ${FUNCS_APP} \
-        --resource-group ${RESOURCE_GROUP} \
-        --settings SB_PROCESS_TOPIC=${SB_PROCESS_TOPIC}
-    az functionapp config appsettings set \
-        --name ${FUNCS_APP} \
-        --resource-group ${RESOURCE_GROUP} \
-        --settings SB_TRANSFORM_TOPIC=${SB_TRANSFORM_TOPIC}
-
-    # subscriptions
-    az functionapp config appsettings set \
-        --name ${FUNCS_APP} \
-        --resource-group ${RESOURCE_GROUP} \
-        --settings SB_SEND_SUBSCRIPTION=${SB_SEND_SUBSCRIPTION}
-    az functionapp config appsettings set \
-        --name ${FUNCS_APP} \
-        --resource-group ${RESOURCE_GROUP} \
-        --settings SB_DISPATCH_SUBSCRIPTION=${SB_DISPATCH_SUBSCRIPTION}
-    az functionapp config appsettings set \
-        --name ${FUNCS_APP} \
-        --resource-group ${RESOURCE_GROUP} \
-        --settings SB_RECEIVE_SUBSCRIPTION=${SB_RECEIVE_SUBSCRIPTION}
-    az functionapp config appsettings set \
-        --name ${FUNCS_APP} \
-        --resource-group ${RESOURCE_GROUP} \
-        --settings SB_PROCESS_SUBSCRIPTION=${SB_PROCESS_SUBSCRIPTION}
-    az functionapp config appsettings set \
-        --name ${FUNCS_APP} \
-        --resource-group ${RESOURCE_GROUP} \
-        --settings SB_TRANSFORM_SUBSCRIPTION=${SB_TRANSFORM_SUBSCRIPTION}
+        --settings \
+        AzureWebJobsStorage=${FUNCS_STORAGE_ACCOUNT_CONNECTION} \
+        SB_CONNECTION_STRING=${SB_CONNECTION_STRING} \
+        SB_SEND_TOPIC=${SB_SEND_TOPIC} \
+        SB_DISPATCH_TOPIC=${SB_DISPATCH_TOPIC} \
+        SB_RECEIVE_TOPIC=${SB_RECEIVE_TOPIC} \
+        SB_PROCESS_TOPIC=${SB_PROCESS_TOPIC} \
+        SB_TRANSFORM_TOPIC=${SB_TRANSFORM_TOPIC} \
+        SB_SEND_SUBSCRIPTION=${SB_SEND_SUBSCRIPTION} \
+        SB_DISPATCH_SUBSCRIPTION=${SB_DISPATCH_SUBSCRIPTION} \
+        SB_RECEIVE_SUBSCRIPTION=${SB_RECEIVE_SUBSCRIPTION} \
+        SB_PROCESS_SUBSCRIPTION=${SB_PROCESS_SUBSCRIPTION} \
+        SB_TRANSFORM_SUBSCRIPTION=${SB_TRANSFORM_SUBSCRIPTION}
 
     # getting additional info from newly created function  app
     echo "enabling function diagnostics: ${FUNCS_APP}"
@@ -369,13 +334,13 @@ function deploy_function_handlers() {
         --application-logging filesystem
 
     # getting additional info from newly created function  app
-    echo "getting additionals settings from functions app: ${FUNCS_APP_PLAN}"
+    echo "getting additionals settings from app: ${FUNCS_APP_PLAN}"
     FUNCS_PRINCIPAL_ID=$(az functionapp show \
         --resource-group ${RESOURCE_GROUP} \
         --name ${FUNCS_APP} \
         --output json | jq -r ".identity.principalId")
 
-    echo "setting security for functions app: ${FUNCS_APP_PLAN}"
+    echo "setting security for app: ${FUNCS_APP_PLAN}"
     az role assignment create \
         --role AcrPull \
         --assignee-principal-type ServicePrincipal \
@@ -468,64 +433,25 @@ function deploy_api_handlers() {
         --runtime "node|12-lts" \
         --deployment-local-git
 
-    # setting configuration
-    echo "applying settings to functions app: ${PROCESS_API_APP_PLAN}"
-    # az webapp config appsettings set \
-    #     --name ${PROCESS_API_APP} \
-    #     --resource-group ${RESOURCE_GROUP} \
-    #     --settings WEBSITES_PORT=3000
-
-    # service bus connection string
+    # settings
+    echo "setting app diagnostics: ${PROCESS_API_APP}"
     az webapp config appsettings set \
         --name ${PROCESS_API_APP} \
         --resource-group ${RESOURCE_GROUP} \
-        --settings SB_CONNECTION_STRING=${SB_CONNECTION_STRING}
-    # topics
-    az webapp config appsettings set \
-        --name ${PROCESS_API_APP} \
-        --resource-group ${RESOURCE_GROUP} \
-        --settings SB_SEND_TOPIC=${SB_SEND_TOPIC}
-    az webapp config appsettings set \
-        --name ${PROCESS_API_APP} \
-        --resource-group ${RESOURCE_GROUP} \
-        --settings SB_DISPATCH_TOPIC=${SB_DISPATCH_TOPIC}
-    az webapp config appsettings set \
-        --name ${PROCESS_API_APP} \
-        --resource-group ${RESOURCE_GROUP} \
-        --settings SB_RECEIVE_TOPIC=${SB_RECEIVE_TOPIC}
-    az webapp config appsettings set \
-        --name ${PROCESS_API_APP} \
-        --resource-group ${RESOURCE_GROUP} \
-        --settings SB_PROCESS_TOPIC=${SB_PROCESS_TOPIC}
-    az webapp config appsettings set \
-        --name ${PROCESS_API_APP} \
-        --resource-group ${RESOURCE_GROUP} \
-        --settings SB_TRANSFORM_TOPIC=${SB_TRANSFORM_TOPIC}
-
-    # subscriptions
-    az webapp config appsettings set \
-        --name ${PROCESS_API_APP} \
-        --resource-group ${RESOURCE_GROUP} \
-        --settings SB_SEND_SUBSCRIPTION=${SB_SEND_SUBSCRIPTION}
-    az webapp config appsettings set \
-        --name ${PROCESS_API_APP} \
-        --resource-group ${RESOURCE_GROUP} \
-        --settings SB_DISPATCH_SUBSCRIPTION=${SB_DISPATCH_SUBSCRIPTION}
-    az webapp config appsettings set \
-        --name ${PROCESS_API_APP} \
-        --resource-group ${RESOURCE_GROUP} \
-        --settings SB_RECEIVE_SUBSCRIPTION=${SB_RECEIVE_SUBSCRIPTION}
-    az webapp config appsettings set \
-        --name ${PROCESS_API_APP} \
-        --resource-group ${RESOURCE_GROUP} \
-        --settings SB_PROCESS_SUBSCRIPTION=${SB_PROCESS_SUBSCRIPTION}
-    az webapp config appsettings set \
-        --name ${PROCESS_API_APP} \
-        --resource-group ${RESOURCE_GROUP} \
-        --settings SB_TRANSFORM_SUBSCRIPTION=${SB_TRANSFORM_SUBSCRIPTION}
-
+        --settings \
+        SB_CONNECTION_STRING=${SB_CONNECTION_STRING} \
+        SB_SEND_TOPIC=${SB_SEND_TOPIC} \
+        SB_DISPATCH_TOPIC=${SB_DISPATCH_TOPIC} \
+        SB_RECEIVE_TOPIC=${SB_RECEIVE_TOPIC} \
+        SB_PROCESS_TOPIC=${SB_PROCESS_TOPIC} \
+        SB_TRANSFORM_TOPIC=${SB_TRANSFORM_TOPIC} \
+        SB_SEND_SUBSCRIPTION=${SB_SEND_SUBSCRIPTION} \
+        SB_DISPATCH_SUBSCRIPTION=${SB_DISPATCH_SUBSCRIPTION} \
+        SB_RECEIVE_SUBSCRIPTION=${SB_RECEIVE_SUBSCRIPTION} \
+        SB_PROCESS_SUBSCRIPTION=${SB_PROCESS_SUBSCRIPTION} \
+        SB_TRANSFORM_SUBSCRIPTION=${SB_TRANSFORM_SUBSCRIPTION}
     # getting additional info from newly created function  app
-    echo "enabling function diagnostics: ${PROCESS_API_APP}"
+    echo "enabling app diagnostics: ${PROCESS_API_APP}"
     az webapp log config \
         --resource-group ${RESOURCE_GROUP} \
         --name ${PROCESS_API_APP} \
@@ -533,13 +459,13 @@ function deploy_api_handlers() {
         --application-logging filesystem
 
     # getting additional info from newly created function  app
-    echo "getting additionals settings from functions app: ${PROCESS_API_APP_PLAN}"
+    echo "getting additionals settings from app: ${PROCESS_API_APP_PLAN}"
     PROCESS_API_PRINCIPAL_ID=$(az webapp show \
         --resource-group ${RESOURCE_GROUP} \
         --name ${PROCESS_API_APP} \
         --output json | jq -r ".identity.principalId")
 
-    echo "setting security for functions app: ${PROCESS_API_APP_PLAN}"
+    echo "setting security for app: ${PROCESS_API_APP_PLAN}"
     az role assignment create \
         --role AcrPull \
         --assignee-principal-type ServicePrincipal \
@@ -547,85 +473,91 @@ function deploy_api_handlers() {
         --scope ${CONTAINER_REGISTRY_ID}  
 }
 
-function publish_api_handlers() {
+function publish_api_handlers() {   
+    # publish 
+    ./publish.sh \
+        ${RESOURCE_GROUP} \
+        ${PROCESS_API_APP} \
+        ${ROOT_DIR}/src/apps/apis/api-handler \
+        ${OUTPUT_DIR}
+
+#     pushd ../apps/apis
+#     # replace where needed
+#     pushd ./api-handler
+#     # get setings
+#     GIT_URI=$(az webapp deployment source config-local-git \
+#         -g ${RESOURCE_GROUP} \
+#         -n ${PROCESS_API_APP} | jq -r .url)
+#     GIT_USER=$(az webapp deployment list-publishing-credentials \
+#         -g ${RESOURCE_GROUP} \
+#         -n ${PROCESS_API_APP} | jq -r .publishingUserName)
+#     GIT_PASSWORD=$(az webapp deployment list-publishing-credentials \
+#         -g ${RESOURCE_GROUP} \
+#         -n ${PROCESS_API_APP} | jq -r .publishingPassword)
+
+#     pushd ..
+
+#     rm -rf output
+#     mkdir -vp output && cd output
+
+#     # clone repo
+#     git clone https://${GIT_USER}:${GIT_PASSWORD}@${PROCESS_API_APP}.scm.azurewebsites.net/${PROCESS_API_APP}.git
+
+#     # go into dir
+#     cd ${PROCESS_API_APP}
+
+#     # configure
+#     git config user.name ${GIT_USER}
+#     git config user.email ${GIT_USER}@${PROCESS_API_APP}
+
+#     # set simple push model
+#     git config push.default simple
+
+#     # copy all
+#     cp -R ../../api-handler/* .
+
+# # override git ignore
+# cat <<-EOF > ./.gitignore
+# npm-debug.log
+# package-lock.json
+# node_modules
+# */doc
+# */test
+# **/*.sh
+# **/*.config.js
+# EOF
+#     # install
+#     npm install
+
+#     # build site
+#     npm run publish
     
-    pushd ../apps/apis
-    # replace where needed
-    pushd ./api-handler
-    # get setings
-    GIT_URI=$(az webapp deployment source config-local-git \
-        -g ${RESOURCE_GROUP} \
-        -n ${PROCESS_API_APP} | jq -r .url)
-    GIT_USER=$(az webapp deployment list-publishing-credentials \
-        -g ${RESOURCE_GROUP} \
-        -n ${PROCESS_API_APP} | jq -r .publishingUserName)
-    GIT_PASSWORD=$(az webapp deployment list-publishing-credentials \
-        -g ${RESOURCE_GROUP} \
-        -n ${PROCESS_API_APP} | jq -r .publishingPassword)
-
-    pushd ..
-
-    rm -rf output
-    mkdir -vp output && cd output
-
-    # clone repo
-    git clone https://${GIT_USER}:${GIT_PASSWORD}@${PROCESS_API_APP}.scm.azurewebsites.net/${PROCESS_API_APP}.git
-
-    # go into dir
-    cd ${PROCESS_API_APP}
-
-    # configure
-    git config user.name ${GIT_USER}
-    git config user.email ${GIT_USER}@${PROCESS_API_APP}
-
-    # set simple push model
-    git config push.default simple
-
-    # copy all
-    cp -R ../../api-handler/* .
-
-# override git ignore
-cat <<-EOF > ./.gitignore
-npm-debug.log
-package-lock.json
-node_modules
-*/doc
-*/test
-**/*.sh
-**/*.config.js
-EOF
-    # install
-    npm install
-
-    # build site
-    npm run publish
+#     # add changes to repo
+#     git add .
     
-    # add changes to repo
-    git add .
-    
-    # commit
-    git commit -m "New deployment"
+#     # commit
+#     git commit -m "New deployment"
 
-    # push it
-    git push https://${GIT_USER}:${GIT_PASSWORD}@${PROCESS_API_APP}.scm.azurewebsites.net/${PROCESS_API_APP}.git
+#     # push it
+#     git push https://${GIT_USER}:${GIT_PASSWORD}@${PROCESS_API_APP}.scm.azurewebsites.net/${PROCESS_API_APP}.git
 
-    cd ../..
+#     cd ../..
 
-    rm -rf output
+#     rm -rf output
 
-    # all done    
-    popd
+#     # all done    
+#     popd
 
-    popd
-    popd
+#     popd
+#     popd
 
-    # tag
-    # echo "tagging container image ${PROCESS_API_IMAGE} with: ${PROCESS_API_REMOTE_IMAGE}"
-    # docker tag ${PROCESS_API_IMAGE} ${PROCESS_API_REMOTE_IMAGE}
+#     # tag
+#     # echo "tagging container image ${PROCESS_API_IMAGE} with: ${PROCESS_API_REMOTE_IMAGE}"
+#     # docker tag ${PROCESS_API_IMAGE} ${PROCESS_API_REMOTE_IMAGE}
 
-    # # push
-    # echo "pushing container image ${PROCESS_API_REMOTE_IMAGE} to ${CONTAINER_REGISTRY}"
-    # docker push ${PROCESS_API_REMOTE_IMAGE}
+#     # # push
+#     # echo "pushing container image ${PROCESS_API_REMOTE_IMAGE} to ${CONTAINER_REGISTRY}"
+#     # docker push ${PROCESS_API_REMOTE_IMAGE}
 }
 
 
@@ -686,7 +618,15 @@ elif [ "${COMMAND}" == "clean" ]; then
             az group delete --name ${RG} --yes --no-wait
         fi
     done
+    # remove output dir
+    rm -rf ${OUTPUT_DIR}
+    # remove output dir
+    rm -rf ./publish_*.sh
+
 elif [ "${COMMAND}" == "deploy" ]; then
+    # setup
+    mkdir -vp ${OUTPUT_DIR}
+
     # create resource group
     deploy_resource_group
     # deploy container registry
@@ -695,7 +635,7 @@ elif [ "${COMMAND}" == "deploy" ]; then
     set_container_context
     
     # deploy service bus
-    deploy_service_bus
+    # deploy_service_bus
     
     # build api handlers
     build_api_handlers
@@ -704,6 +644,7 @@ elif [ "${COMMAND}" == "deploy" ]; then
     # publish api handlers
     publish_api_handlers
 
+    exit
     # build function handlers
     build_function_handlers
     # publish function handlers
