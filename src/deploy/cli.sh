@@ -21,8 +21,10 @@ SB_DISPATCH_TOPIC="dispach-topic"-${UNIQUE_FIX}
 SB_RECEIVE_TOPIC="receive-topic"-${UNIQUE_FIX}
 SB_PROCESS_TOPIC="process-topic"-${UNIQUE_FIX}
 SB_TRANSFORM_TOPIC="transform-topic"-${UNIQUE_FIX}
+SB_CONNECTION_ID=""
 SB_CONNECTION_STRING=""
 SB_CONNECTION_NAME=${PROJECT}-sbc-${UNIQUE_FIX}
+SB_CONNECTION_DEPLOYMENT=${PROJECT}-sbc-deployment-${UNIQUE_FIX}
 SB_SEND_SUBSCRIPTION="send-subscription"-${UNIQUE_FIX}
 SB_DISPATCH_SUBSCRIPTION="dispatch-subscription"-${UNIQUE_FIX}
 SB_RECEIVE_SUBSCRIPTION="receive-subscription"-${UNIQUE_FIX}
@@ -36,7 +38,6 @@ FUNCS_APP=${PROJECT}-fn-app-${UNIQUE_FIX}
 FUNCS_APP_PLAN=${PROJECT}-fn-asp-${UNIQUE_FIX}
 FUNCS_STORAGE_ACCOUNT=${PROJECT}sa${UNIQUE_FIX}
 LOGIC_TRANSFORM=${PROJECT}-lg-app-${UNIQUE_FIX}
-LOGIC_TRANSFORM_DEPLOYMENT=${PROJECT}-lg-app-deployment-${UNIQUE_FIX}
 PROCESS_API_IMAGE=${PROJECT}-process-api:v1.0
 PROCESS_API_REMOTE_IMAGE="<unknown-image>"
 PROCESS_API_APP=${PROJECT}-api-app-${UNIQUE_FIX}
@@ -68,7 +69,6 @@ function deploy_service_bus() {
         --resource-group ${RESOURCE_GROUP} \
         --namespace-name ${SB_NAMESPACE} \
         --name ${SB_DISPATCH_TOPIC}
-
 
     # create topics in service bus
     echo "creating service bus topic: ${SB_RECEIVE_TOPIC}"
@@ -145,6 +145,26 @@ function deploy_service_bus() {
         --max-delivery-count 10 \
         --default-message-time-to-live PT10M \
         --name ${SB_TRANSFORM_SUBSCRIPTION}
+
+    # replace
+    sed \
+        -e "s|<SB_CONNECTION_NAME>|${SB_CONNECTION_NAME}|" \
+        -e "s|<SB_CONNECTION_STRING>|${SB_CONNECTION_STRING}|" \
+        parameters.template.json > parameters.json
+
+    # deploy connection
+    echo "creating api connection for service bus: ${SB_CONNECTION_NAME}"
+    az deployment group create \
+        -g ${RESOURCE_GROUP} \
+        -f ./connection.json \
+        -n ${SB_CONNECTION_DEPLOYMENT} \
+        --parameters @parameters.json
+
+    # extract location
+    SB_CONNECTION_ID=$(az resource show \
+        --resource-group ${RESOURCE_GROUP} \
+        --resource-type "Microsoft.Web/connections" \
+        --name ${SB_CONNECTION_NAME} | jq -r .id)
 }
 
 function deploy_container_registry() {
@@ -200,38 +220,23 @@ function build_logic_handlers() {
 
     # replace where needed
     pushd ./transform-handler
-
-    # replace
-    sed \
-        -e "s|<SB_CONNECTION_NAME>|${SB_CONNECTION_NAME}|" \
-        -e "s|<SB_CONNECTION_STRING>|${SB_CONNECTION_STRING}|" \
-        parameters.template.json > parameters.json
-    # deploy connection
-    echo "creating api connection for app: ${LOGIC_TRANSFORM}"
-    az deployment group create \
-        -g ${RESOURCE_GROUP} \
-        -f ./connection.json \
-        -n ${LOGIC_TRANSFORM_DEPLOYMENT} \
-        --parameters @parameters.json
-
-    # extract location
-    LOGIC_TRANSFORM_CONNECTION_ID=$(az resource show \
-        --resource-group ${RESOURCE_GROUP} \
-        --resource-type "Microsoft.Web/connections" \
-        --name ${SB_CONNECTION_NAME} | jq -r .id)
     # replace
     sed \
         -e "s|<SB_DISPATCH_TOPIC>|${SB_DISPATCH_TOPIC}|" \
         -e "s|<SB_TRANSFORM_TOPIC>|${SB_TRANSFORM_TOPIC}|" \
         -e "s|<SB_DISPATCH_SUBSCRIPTION>|${SB_DISPATCH_SUBSCRIPTION}|" \
         -e "s|<SB_TRANSFORM_SUBSCRIPTION>|${SB_TRANSFORM_SUBSCRIPTION}|" \
-        -e "s|<CONNECTION_ID>|${LOGIC_TRANSFORM_CONNECTION_ID}|" \
+        -e "s|<CONNECTION_ID>|${SB_CONNECTION_ID}|" \
         -e "s|<SUBSCRIPTION_ID>|${SUBSCRIPTION_ID}|" \
         -e "s|<LOCATION>|${LOCATION}|" \
         definition.template.json > definition.json
     popd
     # all done
     popd
+}
+
+function publish_logic_handlers() {
+    echo "publishing logic handlers"
 }
 
 function build_function_handlers() {
@@ -480,102 +485,33 @@ function publish_api_handlers() {
         ${PROCESS_API_APP} \
         ${ROOT_DIR}/src/apps/apis/api-handler \
         ${OUTPUT_DIR}
-
-#     pushd ../apps/apis
-#     # replace where needed
-#     pushd ./api-handler
-#     # get setings
-#     GIT_URI=$(az webapp deployment source config-local-git \
-#         -g ${RESOURCE_GROUP} \
-#         -n ${PROCESS_API_APP} | jq -r .url)
-#     GIT_USER=$(az webapp deployment list-publishing-credentials \
-#         -g ${RESOURCE_GROUP} \
-#         -n ${PROCESS_API_APP} | jq -r .publishingUserName)
-#     GIT_PASSWORD=$(az webapp deployment list-publishing-credentials \
-#         -g ${RESOURCE_GROUP} \
-#         -n ${PROCESS_API_APP} | jq -r .publishingPassword)
-
-#     pushd ..
-
-#     rm -rf output
-#     mkdir -vp output && cd output
-
-#     # clone repo
-#     git clone https://${GIT_USER}:${GIT_PASSWORD}@${PROCESS_API_APP}.scm.azurewebsites.net/${PROCESS_API_APP}.git
-
-#     # go into dir
-#     cd ${PROCESS_API_APP}
-
-#     # configure
-#     git config user.name ${GIT_USER}
-#     git config user.email ${GIT_USER}@${PROCESS_API_APP}
-
-#     # set simple push model
-#     git config push.default simple
-
-#     # copy all
-#     cp -R ../../api-handler/* .
-
-# # override git ignore
-# cat <<-EOF > ./.gitignore
-# npm-debug.log
-# package-lock.json
-# node_modules
-# */doc
-# */test
-# **/*.sh
-# **/*.config.js
-# EOF
-#     # install
-#     npm install
-
-#     # build site
-#     npm run publish
-    
-#     # add changes to repo
-#     git add .
-    
-#     # commit
-#     git commit -m "New deployment"
-
-#     # push it
-#     git push https://${GIT_USER}:${GIT_PASSWORD}@${PROCESS_API_APP}.scm.azurewebsites.net/${PROCESS_API_APP}.git
-
-#     cd ../..
-
-#     rm -rf output
-
-#     # all done    
-#     popd
-
-#     popd
-#     popd
-
-#     # tag
-#     # echo "tagging container image ${PROCESS_API_IMAGE} with: ${PROCESS_API_REMOTE_IMAGE}"
-#     # docker tag ${PROCESS_API_IMAGE} ${PROCESS_API_REMOTE_IMAGE}
-
-#     # # push
-#     # echo "pushing container image ${PROCESS_API_REMOTE_IMAGE} to ${CONTAINER_REGISTRY}"
-#     # docker push ${PROCESS_API_REMOTE_IMAGE}
 }
 
+function do_api_handlers(){
+    # build api handlers
+    build_api_handlers
+    # deploy api handlers
+    deploy_api_handlers
+    # publish api handlers
+    publish_api_handlers
+}
 
-function test_deployment() {
-    echo "testing deployment in ${RESOURCE_GROUP}"
-    # command to execute
-    FUNCS_APP_CODE=$(az functionapp keys list --resource-group ${RESOURCE_GROUP} --name ${FUNCS_APP} | jq -r ".functionKeys.default")
-    TEST_URI="https://${FUNCS_APP}.azurewebsites.net/api/test-handler?code=${FUNCS_CODE}&name=test"
-    curl ${TEST_URI}
+function do_function_handlers(){
+    # build function handlers
+    build_function_handlers
+    # deploy function handlers
+    deploy_function_handlers
+    # publish function handlers
+    publish_function_handlers
+}
 
-    while [ $? -ne 0 ]; do
-        echo "waiting for retry"
-        sleep 10
-        echo "testing at ${TEST_URI}"
-        FUNCS_APP_CODE=$(az functionapp keys list --resource-group ${RESOURCE_GROUP} --name ${FUNCS_APP} | jq -r ".functionKeys.default")
-        TEST_URI="https://${FUNCS_APP}.azurewebsites.net/api/test-handler?code=${FUNCS_CODE}&name=test"
-        curl ${TEST_URI}
-    done   
+function do_logic_handlers(){
+    # build logic handlers
+    build_logic_handlers
+    # deploy logic handlers
+    deploy_logic_handlers
+    # publish logic handlers
+    publish_logic_handlers
 }
 
 # check command
@@ -633,28 +569,14 @@ elif [ "${COMMAND}" == "deploy" ]; then
     deploy_container_registry
     # set proper context
     set_container_context
-
     # deploy service bus
     deploy_service_bus
-    
-    # build api handlers
-    build_api_handlers
-    # deploy api handlers
-    deploy_api_handlers
-    # publish api handlers
-    publish_api_handlers
-
-    # build function handlers
-    build_function_handlers
-    # publish function handlers
-    publish_function_handlers
-    # deploy function handlers
-    deploy_function_handlers
-    
-    # build logic handlers
-    build_logic_handlers
-    # deploy logic handlers
-    deploy_logic_handlers
+    # do api handlers
+    do_api_handlers &
+    # do function handlers
+    do_function_handlers &
+      # do logic handlers
+    do_logic_handlers &
     # all completed lock down security
     save_configuration
     

@@ -1,0 +1,15 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "api_name": {
+            "value": "servicebus"
+        },
+        "connection_name": {
+            "value": "ammmia-sbc-1620227888"
+        },
+        "connection_string": {
+            "value": "Endpoint=sb://ammmia-sbns-1620227888.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=LAFjr8hIgaCE/nMMfVOxli/ADPQRdJIOJ3Y7XizHqAg="
+        }
+    }
+}
