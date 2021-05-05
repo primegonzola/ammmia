@@ -274,7 +274,7 @@ export class Sdk {
                     messages.forEach(message => {
                         // log
                         console.log("receiving message for topic " + topic);
-                        handlers.push(rh(message));
+                        handlers.push(rh(message.body));
                     });
                     // execute handlers
                     const completes = await Promise.all(handlers) as boolean[];

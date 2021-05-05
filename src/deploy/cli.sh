@@ -246,7 +246,7 @@ function build_function_handlers() {
 
     # install sdk
     mkdir -vp common
-    cp ${SCRIPT_DIR}/sdk.ts ./common/
+    cp ${SDK_DIR}/sdk.ts ./common
 
     # replace where needed
     pushd ./send-handler
@@ -397,7 +397,7 @@ function build_api_handlers() {
     pushd ./api-handler
 
     # install sdk
-    cp ${SCRIPT_DIR}/sdk.ts .
+    cp ${SDK_DIR}/sdk.ts .
 
     # sed \
     #     -e "s|<SB_SEND_TOPIC>|${SB_SEND_TOPIC}|" \
@@ -572,6 +572,9 @@ elif [ "${COMMAND}" == "clean" ]; then
 elif [ "${COMMAND}" == "deploy" ]; then
     # setup
     mkdir -vp ${OUTPUT_DIR}
+
+    # install sdk
+    cp ${SDK_DIR}/sdk.ts ../apps/client/src
 
     # create resource group
     deploy_resource_group

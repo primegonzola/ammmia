@@ -17,7 +17,7 @@ const serviceBusTopicTrigger: AzureFunction = async function(context: Context, m
     ));
 
     // done
-    sdk.dispose();
+    await sdk.dispose();
 };
 
 export default serviceBusTopicTrigger;

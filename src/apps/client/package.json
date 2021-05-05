@@ -1,0 +1,19 @@
+{
+    "name": "api-handler",
+    "version": "1.0.0",
+    "description": "",
+    "main": "./dist/index.js",
+    "scripts": {
+        "start": "node dist/index.js",
+        "build": "tsc",
+        "send": "node ./dist/index.js send",
+        "receive": "node ./dist/index.js receive"
+    },
+    "author": "",
+    "license": "MIT",
+    "devDependencies": {},
+    "dependencies": {
+        "typescript": "^4.2.4",
+        "@azure/service-bus": "^7.0.5"
+    }
+}

@@ -1,4 +1,4 @@
-import {performance} from "perf_hooks";
+import { performance } from "perf_hooks";
 import { ServiceBusClient, ServiceBusReceiver } from "@azure/service-bus";
 
 export class Utils {
@@ -139,15 +139,15 @@ export class Sdk {
     private resolveTopic(topic: TopicOptions): string {
         switch (topic) {
             case TopicOptions.Send:
-                return process.env.SB_SEND_TOPIC || this.configuration.subscriptions.send;
+                return process.env.SB_SEND_TOPIC || this.configuration.topics.send;
             case TopicOptions.Receive:
-                return process.env.SB_RECEIVE_TOPIC || this.configuration.subscriptions.receive;
+                return process.env.SB_RECEIVE_TOPIC || this.configuration.topics.receive;
             case TopicOptions.Dispatch:
-                return process.env.SB_DISPATCH_TOPIC || this.configuration.subscriptions.dispatch;
+                return process.env.SB_DISPATCH_TOPIC || this.configuration.topics.dispatch;
             case TopicOptions.Transform:
-                return process.env.SB_TRANSFORM_TOPIC || this.configuration.subscriptions.transform;
+                return process.env.SB_TRANSFORM_TOPIC || this.configuration.topics.transform;
             case TopicOptions.Process:
-                return process.env.SB_PROCESS_TOPIC || this.configuration.subscriptions.process;
+                return process.env.SB_PROCESS_TOPIC || this.configuration.topics.process;
             default:
                 throw new Error("invalid-topic");
         }
@@ -188,23 +188,63 @@ export class Sdk {
         });
 
         // all done
-        sender.close();
+        await sender.close();
     }
 
-    public async send(topic: TopicOptions, message: any): Promise<void> {
+    public async send(topic: TopicOptions, message: ClientMessage): Promise<void> {
         // create our sender
         const sender = this.client.createSender(
             this.resolveTopic(topic));
-        // log
-        console.log("sending message for topic " + topic);
+        console.log(this.resolveTopic(topic));
         // send our message
         await sender.sendMessages({
             body: message
         });
-
         // all done
-        sender.close();
+        await sender.close();
     }
+
+    public async batch(topic: TopicOptions, messages: ClientMessage[]): Promise<void> {
+        // create sender
+        const sender = this.client.createSender(
+            this.resolveTopic(topic));
+
+        // create a batch object
+        let batch = await sender.createMessageBatch();
+
+        // populate
+        for (let i = 0; i < messages.length; i++) {
+            // try to add the message to the batch
+            if (!batch.tryAddMessage({
+                body: messages[i]
+            })) {
+                // if it fails to add the message to the current batch
+                // send the current batch as it is full
+                await sender.sendMessages(batch);
+
+                // then, create a new batch 
+                batch = await sender.createMessageBatch();
+
+                // now, add the message failed to be added to the previous batch to this batch
+                if (!batch.tryAddMessage({
+                    body: messages[i]
+                })) {
+                    // if it still can't be added to the batch, the message is probably too big to fit in a batch
+                    throw new Error("Message too big to fit in a batch");
+                }
+            }
+        }
+
+        // Send the last created batch of messages to the topic
+        await sender.sendMessages(batch);
+
+        /// outpu
+        console.log(`Sent a batch of messages to the topic: ${topic}`);
+
+        // Close the sender
+        await sender.close();
+    }
+
 
     public async receive(topic: TopicOptions, handler: (message: any) => Promise<boolean>,
         count = 1, duration = 5000): Promise<void> {
@@ -253,9 +293,9 @@ export class Sdk {
         }
     }
 
-    public dispose(): void {
+    public async dispose(): Promise<void> {
         if (this.client) {
-            this.client.close();
+            await this.client.close();
         }
     }
 }

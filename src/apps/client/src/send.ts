@@ -1,5 +1,5 @@
-const { ServiceBusClient } = require("@azure/service-bus");
-const config = require("../../../config/configuration");
+import { ServiceBusClient } from "@azure/service-bus";
+import config from "../../../config/configuration";
 
 // retrieve config settings
 const connectionString = config.connection;
